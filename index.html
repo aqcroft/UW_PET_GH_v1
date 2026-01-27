@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UW Earnings Potential Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes slideDown {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        @keyframes bounceOnce {
+            0%, 100% { transform: translateY(0); }
+            25% { transform: translateY(-20px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(-10px); }
+        }
+        @keyframes gentlePulse {
+            0%, 100% { transform: scale(1); }
+            33% { transform: scale(1.05); }
+            66% { transform: scale(1); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(147, 51, 234, 0); }
+            33% { transform: scale(1.05); box-shadow: 0 0 20px rgba(147, 51, 234, 0.6); }
+            66% { transform: scale(1); box-shadow: 0 0 0 rgba(147, 51, 234, 0); }
+        }
+        .animate-slideDown { animation: slideDown 0.2s ease-out forwards; }
+        .animate-confetti { animation: confetti 3s ease-in forwards; }
+        .animate-bounceOnce { animation: bounceOnce 0.6s ease-in-out; }
+        .animate-gentlePulse { animation: gentlePulse 1.5s ease-in-out 3; }
+        .animate-pulseGlow { animation: pulseGlow 1.5s ease-in-out 3; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 p-4 md:p-8">
+    <div id="app"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const UWTracker = () => {
+            const [mode, setMode] = useState('opportunity');
+            const [showCelebration, setShowCelebration] = useState(false);
+            const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [showWIP1, setShowWIP1] = useState(false);
+            const [showWIP2, setShowWIP2] = useState(false);
+            
+            const [opportunityData, setOpportunityData] = useState({
+                selectedCircle: null,
+                showPartnerPrompt: false,
+                previouslyQualified: false,
+                customers: [
+                    { type: 'own', services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false }
+                ]
+            });
+            
+            const [trackData, setTrackData] = useState({
+                selectedCircle: null,
+                showPartnerPrompt: false,
+                showPartnerPopup: false,
+                showIncomeStreamsPopup: false,
+                previouslyQualified: false,
+                qdExpanded: false,
+                qd6Expanded: false,
+                qdPulsed: false,
+                qd6Pulsed: false,
+                customers: [
+                    { type: 'own', services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false },
+                    { type: null, services: 0, isPartner: false }
+                ]
+            });
+            
+            const currentData = mode === 'opportunity' ? opportunityData : trackData;
+            const setCurrentData = mode === 'opportunity' ? setOpportunityData : setTrackData;
+            const { selectedCircle, showPartnerPrompt, showPartnerPopup, showIncomeStreamsPopup, previouslyQualified, qdExpanded, qd6Expanded, qdPulsed, qd6Pulsed, customers } = currentData;
+
+            const calculateCB = (customer) => {
+                if (customer.type === 'own' || customer.type === 'renting') return 0;
+                if (customer.type === 'homeowner') {
+                    if (customer.services === 1) return 50;
+                    if (customer.services === 2) return 100;
+                    if (customer.services === 3) return 250;
+                    if (customer.services === 4) return 300;
+                }
+                return 0;
+            };
+
+            const highActivityCustomers = customers.filter((c, i) => i > 0 && c.type === 'homeowner' && (c.services === 3 || c.services === 4)).length;
+            const habPerCustomer = highActivityCustomers >= 2 ? (highActivityCustomers >= 4 ? 100 : 50) : 0;
+            const totalHAB = highActivityCustomers * habPerCustomer;
+
+            const totalCB = customers.reduce((sum, c) => sum + calculateCB(c), 0);
+            const hasPartner = customers.some((c, i) => i > 0 && c.isPartner);
+            const allCirclesFilled = customers.every(c => c.type !== null);
+            const filledCustomers = customers.filter((c, i) => i > 0 && c.type !== null).length;
+            const qualifiesForFastStart = allCirclesFilled && hasPartner;
+            const fastStartBonus = qualifiesForFastStart ? 500 : 0;
+            const grandTotal = totalCB + totalHAB + fastStartBonus;
+            
+            const tenantCount = customers.filter((c, i) => i > 0 && c.type === 'renting').length;
+            const residualIncome = tenantCount * 2.5;
+
+            const qdUnlocked = filledCustomers >= 2;
+            const qd6Unlocked = filledCustomers >= 5;
+
+            useEffect(() => {
+                if (mode === 'track' && qdUnlocked && !qdPulsed) {
+                    const timer = setTimeout(() => {
+                        setCurrentData(prev => ({ ...prev, qdPulsed: true }));
+                    }, 4500);
+                    return () => clearTimeout(timer);
+                }
+            }, [qdUnlocked, qdPulsed, mode]);
+
+            useEffect(() => {
+                if (mode === 'track' && qd6Unlocked && !qd6Pulsed) {
+                    const timer = setTimeout(() => {
+                        setCurrentData(prev => ({ ...prev, qd6Pulsed: true }));
+                    }, 4500);
+                    return () => clearTimeout(timer);
+                }
+            }, [qd6Unlocked, qd6Pulsed, mode]);
+
+            const getCircleOpacity = (index) => {
+                if (index === 0) return 1;
+                for (let i = 1; i < index; i++) {
+                    if (customers[i].type === null) return 0.3;
+                }
+                if (customers[index].type !== null) return 1;
+                return 1;
+            };
+
+            const canSelectCircle = (index) => {
+                if (index === 0) return false;
+                if (allCirclesFilled) return true;
+                for (let i = 1; i < index; i++) {
+                    if (customers[i].type === null) return false;
+                }
+                return true;
+            };
+
+            const handlePartnerBadgeClick = (e, index) => {
+                e.stopPropagation();
+                if (index === 0 || customers[index].type === null) return;
+                if (filledCustomers < 5) return;
+                
+                const wasQualified = qualifiesForFastStart;
+                const newCustomers = [...customers];
+                newCustomers[index].isPartner = !newCustomers[index].isPartner;
+                setCurrentData({ ...currentData, customers: newCustomers, showPartnerPrompt: false });
+                
+                const nowAllFilled = newCustomers.every(c => c.type !== null);
+                const nowHasPartner = newCustomers.some((c, i) => i > 0 && c.isPartner);
+                const nowQualifies = nowAllFilled && nowHasPartner;
+                
+                if (!wasQualified && nowQualifies && !previouslyQualified) {
+                    setCurrentData({ ...currentData, customers: newCustomers, previouslyQualified: true, showPartnerPrompt: false });
+                    setTimeout(() => {
+                        setShowCelebration(true);
+                        setTimeout(() => setShowCelebration(false), 3000);
+                    }, 200);
+                }
+                
+                if (!nowQualifies) {
+                    setCurrentData({ ...currentData, customers: newCustomers, previouslyQualified: false, showPartnerPrompt: false });
+                }
+            };
+
+            const handleCircleClick = (index) => {
+                if (index === 0 || !canSelectCircle(index)) return;
+                setCurrentData({ ...currentData, selectedCircle: index });
+            };
+
+            const setCustomerType = (type, services = 0) => {
+                if (selectedCircle === null) return;
+                
+                const wasQualified = qualifiesForFastStart;
+                const newCustomers = [...customers];
+                newCustomers[selectedCircle] = { type, services, isPartner: newCustomers[selectedCircle].isPartner };
+                
+                const nowAllFilled = newCustomers.every(c => c.type !== null);
+                const nowHasPartner = newCustomers.some((c, i) => i > 0 && c.isPartner);
+                const nowQualifies = nowAllFilled && nowHasPartner;
+                
+                if (!wasQualified && nowQualifies && !previouslyQualified) {
+                    setCurrentData({ ...currentData, customers: newCustomers, selectedCircle: null, previouslyQualified: true });
+                    setTimeout(() => {
+                        setShowCelebration(true);
+                        setTimeout(() => setShowCelebration(false), 3000);
+                    }, 200);
+                } else if (nowAllFilled && !nowHasPartner) {
+                    setCurrentData({ ...currentData, customers: newCustomers, selectedCircle: null, showPartnerPrompt: true });
+                } else {
+                    setCurrentData({ ...currentData, customers: newCustomers, selectedCircle: null });
+                }
+                
+                if (!nowQualifies) {
+                    setCurrentData(prev => ({ ...prev, previouslyQualified: false }));
+                }
+            };
+
+            const removeCustomer = () => {
+                if (selectedCircle === null) return;
+                const newCustomers = [...customers];
+                newCustomers[selectedCircle] = { type: null, services: 0, isPartner: false };
+                setCurrentData({ ...currentData, customers: newCustomers, selectedCircle: null });
+                
+                const nowQualifies = newCustomers.every(c => c.type !== null) && newCustomers.some((c, i) => i > 0 && c.isPartner);
+                if (!nowQualifies) {
+                    setCurrentData(prev => ({ ...prev, previouslyQualified: false }));
+                }
+            };
+
+            const resetTracking = () => {
+                const resetState = {
+                    selectedCircle: null,
+                    showPartnerPrompt: false,
+                    showPartnerPopup: false,
+                    showIncomeStreamsPopup: false,
+                    previouslyQualified: false,
+                    qdExpanded: false,
+                    qd6Expanded: false,
+                    qdPulsed: false,
+                    qd6Pulsed: false,
+                    customers: [
+                        { type: 'own', services: 0, isPartner: false },
+                        { type: null, services: 0, isPartner: false },
+                        { type: null, services: 0, isPartner: false },
+                        { type: null, services: 0, isPartner: false },
+                        { type: null, services: 0, isPartner: false },
+                        { type: null, services: 0, isPartner: false }
+                    ]
+                };
+                
+                if (mode === 'opportunity') {
+                    setOpportunityData(resetState);
+                } else {
+                    setTrackData(resetState);
+                }
+                setShowResetConfirm(false);
+            };
+
+            const RefreshCw = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            );
+
+            const TrendingUp = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            );
+
+            const Lock = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            );
+
+            const Unlock = ({ className }) => (
+                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+            );
+
+            const renderCircle = (customer, index) => (
+                <div key={index} className="flex flex-col items-center relative">
+                    <div 
+                        onClick={() => handleCircleClick(index)} 
+                        style={{ opacity: getCircleOpacity(index) }} 
+                        className={`w-20 h-20 rounded-full border-4 flex flex-col items-center justify-center text-lg font-bold transition-all relative ${
+                            customer.type === null 
+                                ? 'border-gray-300 text-gray-400 bg-gray-50' 
+                                : customer.type === 'own' 
+                                ? 'border-gray-400 text-gray-700 bg-gray-100' 
+                                : customer.type === 'renting' 
+                                ? 'border-blue-600 text-blue-700 bg-blue-50' 
+                                : 'border-purple-600 text-purple-700 bg-purple-50'
+                        } ${
+                            index > 0 && selectedCircle === index ? 'ring-4 ring-purple-300' : ''
+                        } ${
+                            canSelectCircle(index) ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed'
+                        }`}
+                    >
+                        {index === 0 ? (
+                            <span className="text-lg font-bold">You</span>
+                        ) : customer.type ? (
+                            <>
+                                <span className="text-sm font-bold">£{calculateCB(customer).toLocaleString()}</span>
+                                {customer.type === 'homeowner' && (customer.services === 3 || customer.services === 4) && highActivityCustomers >= 2 && (
+                                    <div className="absolute -top-1 -right-1 px-1 py-0.5 bg-orange-500 text-white text-xs font-bold rounded z-[5]">
+                                        +£{habPerCustomer}
+                                    </div>
+                                )}
+                                <div 
+                                    onClick={(e) => handlePartnerBadgeClick(e, index)} 
+                                    className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 flex items-center justify-center z-[5] transition-transform ${
+                                        filledCustomers >= 5 
+                                            ? 'cursor-pointer hover:scale-110' 
+                                            : 'cursor-not-allowed opacity-50'
+                                    } ${
+                                        customer.isPartner 
+                                            ? 'bg-yellow-400 border-yellow-600' 
+                                            : 'bg-gray-200 border-gray-400 hover:border-yellow-500'
+                                    }`}
+                                >
+                                    <span className={`text-xs font-bold ${customer.isPartner ? 'text-yellow-900' : 'text-gray-500'}`}>
+                                        P
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {index === 1 ? '2nd' : index === 2 ? '3rd' : `${index + 1}th`}
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gray-200 border-2 border-gray-400 flex items-center justify-center z-[5] opacity-50">
+                                    <span className="text-xs font-bold text-gray-500">P</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 p-4 md:p-8">
+                    {showCelebration && (
+                        <div className="fixed inset-0 pointer-events-none z-50">
+                            {[...Array(50)].map((_, i) => (
+                                <div key={i} className="absolute animate-confetti" style={{ left: `${Math.random() * 100}%`, top: '-10%', animationDelay: `${Math.random() * 0.5}s`, animationDuration: `${2 + Math.random() * 1}s` }}>
+                                    <div className="text-yellow-400" style={{ fontSize: `${Math.random() * 20 + 10}px`, transform: `rotate(${Math.random() * 360}deg)` }}>✨</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    
+                    <div className="max-w-2xl mx-auto">
+                        <div className="text-center mb-4">
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">UW Earnings Potential Tool</h1>
+                            <p className="text-sm md:text-base text-gray-600 mb-3">Explore what five customers could earn you in the first 30 days</p>
+                            
+                            <div className="flex justify-between items-center">
+                                {mode === 'opportunity' ? (
+                                    <>
+                                        <button
+                                            onClick={() => setShowWIP1(true)}
+                                            className="flex items-center gap-2 group"
+                                        >
+                                            <div className="relative w-12 h-6 bg-teal-300 rounded-full transition-all group-hover:bg-teal-400">
+                                                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all"></div>
+                                            </div>
+                                            <span className="text-xs font-semibold text-teal-700">You</span>
+                                        </button>
+
+                                        <div className="inline-flex rounded-lg border-2 border-purple-300 overflow-hidden">
+                                            <button
+                                                onClick={() => setMode('opportunity')}
+                                                className={`px-4 py-2 text-sm font-semibold transition-all ${
+                                                    mode === 'opportunity'
+                                                        ? 'bg-purple-600 text-white'
+                                                        : 'bg-white text-gray-700 hover:bg-purple-50'
+                                                }`}
+                                            >
+                                                Show
+                                            </button>
+                                            <button
+                                                onClick={() => setMode('track')}
+                                                className={`px-4 py-2 text-sm font-semibold transition-all ${
+                                                    mode === 'track'
+                                                        ? 'bg-purple-600 text-white'
+                                                        : 'bg-white text-gray-700 hover:bg-purple-50'
+                                                }`}
+                                            >
+                                                Explore
+                                            </button>
+                                        </div>
+
+                                        <div className="w-[76px]"></div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setShowWIP1(true)}
+                                            className="flex items-center gap-2 group"
+                                        >
+                                            <div className="relative w-12 h-6 bg-teal-300 rounded-full transition-all group-hover:bg-teal-400">
+                                                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all"></div>
+                                            </div>
+                                            <span className="text-xs font-semibold text-teal-700">You</span>
+                                        </button>
+
+                                        <div className="inline-flex rounded-lg border-2 border-purple-300 overflow-hidden">
+                                            <button
+                                                onClick={() => setMode('opportunity')}
+                                                className={`px-4 py-2 text-sm font-semibold transition-all ${
+                                                    mode === 'opportunity'
+                                                        ? 'bg-purple-600 text-white'
+                                                        : 'bg-white text-gray-700 hover:bg-purple-50'
+                                                }`}
+                                            >
+                                                Show
+                                            </button>
+                                            <button
+                                                onClick={() => setMode('track')}
+                                                className={`px-4 py-2 text-sm font-semibold transition-all ${
+                                                    mode === 'track'
+                                                        ? 'bg-purple-600 text-white'
+                                                        : 'bg-white text-gray-700 hover:bg-purple-50'
+                                                }`}
+                                            >
+                                                Explore
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setShowWIP2(true)}
+                                            className="flex items-center gap-2 group"
+                                        >
+                                            <span className="text-xs font-semibold text-teal-700">CB Calc</span>
+                                            <div className="relative w-12 h-6 bg-teal-300 rounded-full transition-all group-hover:bg-teal-400">
+                                                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all"></div>
+                                            </div>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                            {mode === 'opportunity' ? (
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    {customers.map((customer, index) => renderCircle(customer, index))}
+                                </div>
+                            ) : (
+                                <div className="mb-6">
+                                    <div className="grid grid-cols-3 gap-4 mb-3">
+                                        {customers.slice(0, 3).map((customer, index) => renderCircle(customer, index))}
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <div
+                                            onClick={() => qdUnlocked && setCurrentData({ ...currentData, qdExpanded: !qdExpanded, qd6Expanded: false })}
+                                            className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 transition-all ${
+                                                qdUnlocked
+                                                    ? 'bg-purple-50 border-purple-400 cursor-pointer hover:bg-purple-100'
+                                                    : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-60'
+                                            } ${qdUnlocked && !qdPulsed ? 'animate-gentlePulse' : ''}`}
+                                        >
+                                            {qdUnlocked ? <Unlock className="w-4 h-4 text-purple-600" /> : <Lock className="w-4 h-4 text-gray-400" />}
+                                            <span className={`text-sm font-semibold ${qdUnlocked ? 'text-purple-700' : 'text-gray-500'}`}>
+                                                {qdUnlocked ? 'QD Promotion! New Revenue Stream unlocked (Tap for details)' : 'QD Unlock (3 customers needed)'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4 mb-3">
+                                        {customers.slice(3, 6).map((customer, index) => renderCircle(customer, index + 3))}
+                                    </div>
+
+                                    <div>
+                                        <div
+                                            onClick={() => qd6Unlocked && setCurrentData({ ...currentData, qd6Expanded: !qd6Expanded, qdExpanded: false })}
+                                            className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 transition-all ${
+                                                qd6Unlocked
+                                                    ? 'bg-purple-50 border-purple-400 cursor-pointer hover:bg-purple-100'
+                                                    : 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-60'
+                                            } ${qd6Unlocked && !qd6Pulsed ? 'animate-pulseGlow' : ''}`}
+                                        >
+                                            {qd6Unlocked ? <Unlock className="w-4 h-4 text-purple-600" /> : <Lock className="w-4 h-4 text-gray-400" />}
+                                            <span className={`text-sm font-semibold ${qd6Unlocked ? 'text-purple-700' : 'text-gray-500'}`}>
+                                                {qd6Unlocked ? '6 customers! 3 New Revenue Streams unlocked (Tap for details)' : '6 Customer Unlock (6 customers needed)'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                <div className={`flex justify-between items-center py-3 px-4 rounded-lg border-4 transition-all ${totalCB > 0 ? 'bg-purple-50 border-purple-600' : 'bg-gray-50 border-gray-300'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-xl ${totalCB > 0 ? '' : 'grayscale opacity-40'}`}>💷</span>
+                                        <span className={`font-semibold ${totalCB > 0 ? 'text-purple-600' : 'text-gray-600'}`}>Customer Bonus:</span>
+                                    </div>
+                                    <span className={`text-xl font-bold ${totalCB > 0 ? 'text-purple-700' : 'text-gray-400'}`}>£{totalCB.toLocaleString()}</span>
+                                </div>
+
+                                {highActivityCustomers >= 2 && (
+                                    <div className="flex justify-between items-center py-3 px-4 rounded-lg border-4 bg-orange-50 border-orange-500 transition-all">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl">🔥</span>
+                                            <span className="font-semibold text-orange-600">High Activity Bonus:</span>
+                                        </div>
+                                        <span className="text-xl font-bold text-orange-600">£{totalHAB.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                <div className={`flex justify-between items-center py-3 px-4 rounded-lg transition-all ${qualifiesForFastStart ? 'bg-green-50 border-2 border-green-300' : 'bg-gray-50 border-2 border-gray-200'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <TrendingUp className={`w-5 h-5 ${qualifiesForFastStart ? 'text-green-600' : 'text-gray-400'}`} />
+                                        <span className={`font-semibold ${qualifiesForFastStart ? 'text-green-600' : 'text-gray-700'}`}>Fast Start Bonus:</span>
+                                    </div>
+                                    <span className={`text-xl font-bold ${qualifiesForFastStart ? 'text-green-600' : 'text-gray-400'}`}>£{fastStartBonus.toLocaleString()}</span>
+                                </div>
+
+                                <div
