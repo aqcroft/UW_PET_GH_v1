@@ -17,17 +17,23 @@
   .animate-bounceOnce { animation: bounceOnce 0.6s ease-in-out; }
   * { box-sizing: border-box; }
 
-  /* Landscape layout: two-column accordion list */
+  /* Landscape: 2-col accordion, wider popup */
   @media (orientation: landscape) and (max-height: 500px) {
     .popup-inner {
-      max-width: 56rem !important;
+      max-width: 58rem !important;
       max-height: 95vh !important;
     }
+    /* flex → grid so items stack naturally in each column */
     .accordion-list {
       display: grid !important;
       grid-template-columns: 1fr 1fr !important;
-      gap: 0.5rem !important;
+      gap: 0.4rem !important;
       align-items: start !important;
+      /* IMPORTANT: each grid cell must not be overflow:hidden */
+    }
+    /* each accordion card must allow its expanded content to push siblings down */
+    .accordion-list > div {
+      overflow: visible !important;
     }
   }
 </style>
@@ -37,7 +43,7 @@
 <script type="text/babel">
 const { useState, useRef } = React;
 
-/* ── SVG Icons ── sized via explicit style prop ── */
+/* ── SVG Icons ── */
 const defaultIconStyle = { width:'1rem', height:'1rem', flexShrink:0 };
 const TrendingUp = ({ style }) => (
   <svg style={style||defaultIconStyle} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,9 +86,16 @@ const SM  = { width:'1rem',    height:'1rem',    flexShrink:0 };
 const MD  = { width:'1.25rem', height:'1.25rem', flexShrink:0 };
 const XS  = { width:'0.875rem',height:'0.875rem',flexShrink:0 };
 
-/* ── shared box style — all light purple, no bold in data rows ── */
+/* Recurring-income icon inline (matches main screen) */
+const RcwSM = ({ color }) => (
+  <svg style={{...SM, color: color||'#6b7280'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+/* shared styles */
 const box = { background:'#f5f3ff', borderRadius:'0.5rem', padding:'0.75rem', marginBottom:'0.5rem' };
-const closingItalic = { fontStyle:'italic', fontWeight:'700', color:'#111827', margin:0 };
+const closing = { fontStyle:'italic', fontWeight:'700', color:'#111827', margin:0 };
 
 const sections = [
   {
@@ -90,12 +103,12 @@ const sections = [
     summary: 'Upfront payment when we introduce a homeowner customer.',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.5rem'}}>Customer Bonus paid when services go live:</p>
+        <p style={{marginBottom:'0.5rem'}}>Paid when services go live:</p>
         <div style={{...box, display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.25rem'}}>
           <span>1️⃣ service — £50</span><span>3️⃣ services — £250</span>
           <span>2️⃣ services — £100</span><span>4️⃣ services — £300</span>
         </div>
-        <p style={closingItalic}>✨ The more customers we introduce, the more we earn.</p>
+        <p style={closing}>✨ The more customers we introduce, the more we earn.</p>
       </div>
     ),
   },
@@ -109,26 +122,32 @@ const sections = [
           <div>2️⃣ or more homeowners — £50 each</div>
           <div>4️⃣ or more homeowners — £100 each</div>
         </div>
-        <p style={closingItalic}>🔥 Customer Bonus + High Activity Bonus = up to £400 per homeowner.</p>
+        <p style={closing}>✨ With Customer Bonus that's up to £400 per homeowner.</p>
       </div>
     ),
   },
   {
-    id: 'ri', icon: '♻️', title: 'Residual Income',
+    id: 'ri', icon: '♻️', title: 'Recurring Income',
     summary: "Ongoing monthly income from our customers — and our team's customers.",
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.5rem'}}>A recurring profit share of customers' bills, growing as they add services.</p>
+        <p style={{marginBottom:'0.5rem'}}>A profit share of customers' bills, growing as they add services.</p>
         <div style={{...box, marginBottom:'0.35rem'}}>
-          <p style={{fontWeight:'600',marginBottom:'0.35rem',margin:'0 0 0.35rem 0'}}>👤 Personal Customers <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280'}}>— % of the bill</span></p>
-          <div>• Tenant — £2–£3 /m <span style={{color:'#6b7280',fontSize:'0.7rem'}}>(after first bill is paid)</span></div>
-          <div>• Homeowner — £3–£5 /m <span style={{color:'#6b7280',fontSize:'0.7rem'}}>(after a set period of time)</span></div>
+          <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+            👤 <strong>Personal Customers</strong> <RcwSM color="#7c3aed" />
+            <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— % of bill</span>
+          </p>
+          <div>• Tenant — £2–£3 /m <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after first bill paid)</span></div>
+          <div>• Homeowner — £3–£5 /m <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after a set period)</span></div>
         </div>
         <div style={box}>
-          <p style={{fontWeight:'600',margin:'0 0 0.35rem 0'}}>👥 Team (Group) Customers <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280'}}>— fixed pence per service</span></p>
+          <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+            👥 <strong>Team Customers</strong> <RcwSM color="#7c3aed" />
+            <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— pence per service</span>
+          </p>
           <div>• Typically £0.30–£0.50 per customer /m</div>
         </div>
-        <p style={{...closingItalic, marginTop:'0.35rem'}}>♻️ Residual income grows month by month as our team and customer base grows.</p>
+        <p style={{...closing, marginTop:'0.35rem'}}>✨ Grows steadily as our customers and team expand.</p>
       </div>
     ),
   },
@@ -139,14 +158,14 @@ const sections = [
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>We receive <strong>50%</strong> of the full Customer Bonus.</p>
         <div style={{...box, fontSize:'0.8rem'}}>
-          <div style={{marginBottom:'0.2rem'}}>⏱️ <strong>First 45 days</strong> — in addition to their Customer Bonus</div>
-          <div>➡️ <strong>After 45 days</strong> — from within their Customer Bonus</div>
+          <div style={{marginBottom:'0.25rem'}}>⏱️ <strong>First 45 days</strong> — in addition to their Customer Bonus</div>
+          <div>➡️ <strong>After 45 days</strong> — Customer Bonus is shared 50:50</div>
         </div>
         <div style={{...box, display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.25rem', marginBottom:'0.5rem'}}>
           <span>1️⃣ service — £25</span><span>3️⃣ services — £125</span>
           <span>2️⃣ services — £50</span><span>4️⃣ services — £150</span>
         </div>
-        <p style={closingItalic}>🤝 Supporting Partners is a win-win — they grow, we earn.</p>
+        <p style={closing}>✨ An extra income stream from helping Partners introduce homeowners.</p>
       </div>
     ),
   },
@@ -155,21 +174,22 @@ const sections = [
     summary: 'Up to £400 when a Partner we introduce reaches QD*.',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.5rem'}}>When a Partner reaches <strong>QD*</strong>:</p>
-        <p style={{fontSize:'0.75rem',color:'#6b7280',marginBottom:'0.5rem',marginTop:'-0.25rem'}}>(6 personal customers + 1 Partner introduced)</p>
+        <p style={{marginBottom:'0.25rem'}}>When a Partner reaches <strong>QD*</strong>:</p>
+        <p style={{fontSize:'0.75rem',color:'#6b7280',margin:'0 0 0.5rem 0'}}>(6 personal customers + 1 Partner introduced)</p>
         <div style={box}>
           <div>🎓 Mentoring Bonus — £100</div>
           <div>🚀 Fast Start Bonus (within 30 days) — £300</div>
-          <div style={{borderTop:'1px solid #c4b5fd',marginTop:'0.5rem',paddingTop:'0.5rem'}}>🎓🚀 Total — <strong style={{color:'#6d28d9'}}>£400</strong></div>
+          <div style={{borderTop:'1px solid #c4b5fd',marginTop:'0.5rem',paddingTop:'0.5rem',paddingLeft:'1.5rem'}}>
+            Total — <strong style={{color:'#6d28d9'}}>£400</strong>
+          </div>
         </div>
-        <p style={closingItalic}>🎓 Every Partner we mentor to QD earns us up to £400.</p>
+        <p style={closing}>✨ Rewarding us for developing new Partners — with even more for Fast Start.</p>
       </div>
     ),
   },
 ];
 
 const HowPaidPopup = ({ onClose }) => {
-  /* single-open: store the one open id (or null) */
   const [openId, setOpenId] = useState(null);
   const toggle = (id) => setOpenId(prev => prev === id ? null : id);
 
@@ -187,25 +207,25 @@ const HowPaidPopup = ({ onClose }) => {
         <div style={{padding:'1rem 1rem 0.6rem',borderBottom:'1px solid #f3f4f6',display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexShrink:0}}>
           <div>
             <h3 style={{fontSize:'1.05rem',fontWeight:'700',color:'#111827',margin:0}}>How Are UW Partners Paid?</h3>
-            <p style={{fontSize:'0.7rem',color:'#6b7280',marginTop:'0.2rem',marginBottom:0}}>We earn upfront for activity today — and ongoing income over time.</p>
+            <p style={{fontSize:'0.75rem',color:'#6b7280',marginTop:'0.2rem',marginBottom:0}}>We earn upfront for activity today — and recurring income over time.</p>
           </div>
           <button onClick={onClose} style={{marginLeft:'0.75rem',width:'1.75rem',height:'1.75rem',borderRadius:'50%',background:'#f3f4f6',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
             <X style={{...XS, color:'#4b5563'}} />
           </button>
         </div>
 
-        {/* Accordion list — becomes 2-col in landscape via CSS */}
+        {/* Accordion list */}
         <div className="accordion-list" style={{overflowY:'auto',flex:1,padding:'0.6rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
           {sections.map(s => (
-            <div key={s.id} style={{border:'1px solid #e5e7eb',borderRadius:'0.6rem',overflow:'hidden'}}>
+            <div key={s.id} style={{border:'1px solid #e5e7eb',borderRadius:'0.6rem',overflow:'hidden',background:'white'}}>
               <button
                 style={{width:'100%',display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.75rem',textAlign:'left',background:'none',border:'none',cursor:'pointer'}}
                 onClick={()=>toggle(s.id)}
               >
                 <span style={{fontSize:'1.1rem',flexShrink:0}}>{s.icon}</span>
                 <div style={{flex:1,minWidth:0}}>
-                  <p style={{fontWeight:'600',fontSize:'0.825rem',color:'#111827',margin:'0 0 0.1rem 0'}}>{s.title}</p>
-                  <p style={{fontSize:'0.7rem',color:'#6b7280',margin:0,lineHeight:'1.4',whiteSpace:'normal'}}>{s.summary}</p>
+                  <p style={{fontWeight:'600',fontSize:'0.85rem',color:'#111827',margin:'0 0 0.1rem 0'}}>{s.title}</p>
+                  <p style={{fontSize:'0.78rem',color:'#6b7280',margin:0,lineHeight:'1.4',whiteSpace:'normal'}}>{s.summary}</p>
                 </div>
                 {openId === s.id
                   ? <ChevronUp style={{...SM, color:'#9ca3af'}} />
