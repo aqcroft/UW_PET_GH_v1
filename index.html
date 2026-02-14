@@ -80,7 +80,6 @@ const box  = { background:'#f5f3ff', borderRadius:'0.5rem', padding:'0.75rem', m
 const closing = { fontStyle:'italic', fontWeight:'700', color:'#111827', margin:0 };
 const unlockStyle = { fontStyle:'italic', fontSize:'0.72rem', color:'#7c3aed', margin:'0.2rem 0 0.35rem 0', lineHeight:'1.3' };
 
-/* ── Accordion section definitions ── */
 const sections = [
   {
     id: 'cb',
@@ -119,12 +118,10 @@ const sections = [
     icon: <RcwIcon style={{...SM, color:'#2563eb'}} />,
     title: 'Recurring (Residual) Income',
     summary: 'Ongoing monthly income from our personal customers and our team\'s customers.',
-    /* no unlockNote on collapsed — unlock info lives only in expanded detail */
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>A recurring profit share of customers' bills which increases as customers add more services.</p>
         <div style={{...box, marginBottom:'0.5rem'}}>
-          {/* Personal Customers */}
           <p style={{margin:'0 0 0 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
             <RcwIcon style={{...XS, color:'#2563eb'}} />
             <span>👤</span>
@@ -134,7 +131,6 @@ const sections = [
           <p style={unlockStyle}>🔓 Unlocks at 6 Personal Customers</p>
           <div>• Tenant — £2–£3 per month <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after first bill paid)</span></div>
           <div style={{marginBottom:'0.5rem'}}>• Homeowner — £3–£5 per month <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after a set period)</span></div>
-          {/* Team Customers */}
           <div style={{borderTop:'1px solid #c4b5fd',paddingTop:'0.4rem'}}>
             <p style={{margin:'0 0 0 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
               <RcwIcon style={{...XS, color:'#2563eb'}} />
@@ -154,7 +150,8 @@ const sections = [
     id: 'scb',
     icon: <span style={{fontSize:'1.1rem'}}>🤝</span>,
     title: 'Supporting Customer Bonus †',
-    summary: 'Upfront payment when we support a Partner to introduce a homeowner.',
+    /* unlock note folded in as sentence continuation */
+    summary: 'Upfront payment when we support a Partner to introduce a homeowner. 🔓 Unlocks at 6 Personal Customers.',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>We receive <strong>50%</strong> of the full Customer Bonus.</p>
@@ -166,7 +163,6 @@ const sections = [
             <span>2️⃣ services — £50</span><span>4️⃣ services — £150</span>
           </div>
         </div>
-        <p style={{...unlockStyle, margin:'0 0 0.5rem 0'}}>🔓 Unlocks at 6 Personal Customers</p>
         <p style={closing}>✨ An extra income stream from helping Partners introduce homeowners.</p>
       </div>
     ),
@@ -175,7 +171,8 @@ const sections = [
     id: 'mb',
     icon: <span style={{fontSize:'1.1rem'}}>🎓</span>,
     title: 'Mentoring Bonus †',
-    summary: 'Up to £400 when a Partner we introduce reaches QD*.',
+    /* unlock note folded in as sentence continuation */
+    summary: 'Up to £400 when a Partner we introduce reaches QD*. 🔓 Unlocks at 3 Personal Customers.',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem',fontWeight:'600'}}>QD* = 6 Personal Customers + 1 Partner introduced</p>
@@ -191,7 +188,6 @@ const sections = [
             Total — £400 per Partner
           </div>
         </div>
-        <p style={{...unlockStyle, margin:'0 0 0.5rem 0'}}>🔓 Unlocks at 3 Personal Customers</p>
         <p style={closing}>✨ Rewarding us for developing new Partners — with even more for Fast Start.</p>
       </div>
     ),
@@ -220,7 +216,6 @@ const HowPaidPopup = ({ onClose }) => {
         style={{background:'white',borderRadius:'0.75rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'28rem',width:'100%',display:'flex',flexDirection:'column',height:'85vh'}}
         onClick={e=>e.stopPropagation()}
       >
-        {/* Header */}
         <div style={{padding:'1rem 1rem 0.6rem',borderBottom:'1px solid #f3f4f6',display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexShrink:0}}>
           <div>
             <h3 style={{fontSize:'1.05rem',fontWeight:'700',color:'#111827',margin:0}}>How Are UW Partners Paid?</h3>
@@ -231,7 +226,6 @@ const HowPaidPopup = ({ onClose }) => {
           </button>
         </div>
 
-        {/* Accordion list */}
         <div className="accordion-list" style={{overflowY:'auto',flex:1,padding:'0.6rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
           {sections.map(s => (
             <div key={s.id} style={{border:'1px solid #e5e7eb',borderRadius:'0.6rem',overflow:'hidden',background:'white'}}>
@@ -258,7 +252,6 @@ const HowPaidPopup = ({ onClose }) => {
             </div>
           ))}
 
-          {/* Dagger footnote — two lines */}
           <p style={{fontSize:'0.7rem',color:'#9ca3af',textAlign:'center',margin:'0.25rem 0 0.1rem',fontStyle:'italic',lineHeight:'1.6'}}>
             † Complete Fast Start Bonus on the main screen to see<br/>a worked example of Supporting and Mentoring Bonuses.
           </p>
