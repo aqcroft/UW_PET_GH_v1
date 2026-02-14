@@ -16,7 +16,6 @@
   .animate-confetti { animation: confetti 3s ease-in forwards; }
   .animate-bounceOnce { animation: bounceOnce 0.6s ease-in-out; }
   * { box-sizing: border-box; }
-
   @media (orientation: landscape) and (max-height: 500px) {
     .popup-inner { max-width: 58rem !important; height: 92vh !important; }
     .accordion-list { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 0.4rem !important; align-items: start !important; }
@@ -71,15 +70,15 @@ const SM  = { width:'1rem',    height:'1rem',    flexShrink:0 };
 const MD  = { width:'1.25rem', height:'1.25rem', flexShrink:0 };
 const XS  = { width:'0.875rem',height:'0.875rem',flexShrink:0 };
 
-/* Reusable recurring SVG icon */
 const RcwIcon = ({ style }) => (
-  <svg style={style||{...SM,color:'currentColor'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg style={style||{...SM}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
   </svg>
 );
 
 const box = { background:'#f5f3ff', borderRadius:'0.5rem', padding:'0.75rem', marginBottom:'0.5rem' };
 const closing = { fontStyle:'italic', fontWeight:'700', color:'#111827', margin:0 };
+const unlock = { fontStyle:'italic', fontSize:'0.72rem', color:'#7c3aed', margin:'0.3rem 0 0 0' };
 
 const sections = [
   {
@@ -87,6 +86,7 @@ const sections = [
     icon: <span style={{fontSize:'1.1rem'}}>💷</span>,
     title: 'Customer Bonus',
     summary: 'Upfront payment when we introduce a homeowner customer.',
+    unlockNote: null,
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>Paid when services go live:</p>
@@ -103,9 +103,10 @@ const sections = [
     icon: <span style={{fontSize:'1.1rem'}}>🔥</span>,
     title: 'High Activity Bonus',
     summary: 'Extra reward for multiple 3+ service homeowners in one calendar month.',
+    unlockNote: null,
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.5rem'}}>Added on top of Customer Bonus:</p>
+        <p style={{marginBottom:'0.5rem'}}>On top of Customer Bonus:</p>
         <div style={box}>
           <div>2️⃣ or more homeowners — £50 each</div>
           <div>4️⃣ or more homeowners — £100 each</div>
@@ -116,51 +117,54 @@ const sections = [
   },
   {
     id: 'ri',
-    /* collapsed header icon = SVG recurring icon */
-    icon: <RcwIcon style={{...SM, color:'#6b7280'}} />,
-    title: 'Recurring Income',
-    summary: "Ongoing monthly income from our customers — and our team's customers.",
+    icon: <RcwIcon style={{...SM, color:'#2563eb'}} />,
+    title: 'Recurring (Residual) Income',
+    summary: 'Ongoing monthly income from our personal customers and our team\'s customers.',
+    unlockNote: '🔓 Unlocks at 3 & 6 Personal Customers',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.5rem'}}>A profit share of customers' bills, growing as they add services.</p>
-        <div style={{...box, marginBottom:'0.35rem'}}>
+        <p style={{marginBottom:'0.5rem'}}>A recurring profit share of customers' bills. It increases as customers add more services.</p>
+        <div style={{...box, marginBottom:'0.5rem'}}>
           <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
             <span>👤</span>
-            <RcwIcon style={{...XS, color:'#7c3aed'}} />
+            <RcwIcon style={{...XS, color:'#2563eb'}} />
             <strong>Personal Customers</strong>
             <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— % of bill</span>
           </p>
-          <div>• Tenant — £2–£3 /m <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after first bill paid)</span></div>
-          <div>• Homeowner — £3–£5 /m <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after a set period)</span></div>
+          <div>• Tenant — typically £2–£3 per month <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after first bill paid)</span></div>
+          <div style={{marginBottom:'0.3rem'}}>• Homeowner — typically £3–£5 per month <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after a set period)</span></div>
+          <p style={{fontStyle:'italic',fontSize:'0.72rem',color:'#7c3aed',margin:'0.3rem 0 0.5rem 0'}}>🔓 Unlocks at 6 Personal Customers</p>
+          <div style={{borderTop:'1px solid #c4b5fd',paddingTop:'0.4rem'}}>
+            <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
+              <span>👥</span>
+              <RcwIcon style={{...XS, color:'#2563eb'}} />
+              <strong>Team (Group) Customers</strong>
+              <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— pence per service</span>
+            </p>
+            <div>• Typically 30p–50p per customer per month</div>
+            <p style={{fontStyle:'italic',fontSize:'0.72rem',color:'#7c3aed',margin:'0.3rem 0 0 0'}}>🔓 Unlocks at 3 Personal Customers</p>
+          </div>
         </div>
-        <div style={box}>
-          <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
-            <span>👥</span>
-            <RcwIcon style={{...XS, color:'#7c3aed'}} />
-            <strong>Team Customers</strong>
-            <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— pence per service</span>
-          </p>
-          <div>• Typically 30p–50p per customer /m</div>
-        </div>
-        <p style={{...closing, marginTop:'0.35rem'}}>✨ Grows steadily as our customers and team expand.</p>
+        <p style={closing}>✨ Grows steadily as our customers and team expand.</p>
       </div>
     ),
   },
   {
     id: 'scb',
     icon: <span style={{fontSize:'1.1rem'}}>🤝</span>,
-    title: 'Supporting Customer Bonus',
+    title: 'Supporting Customer Bonus †',
     summary: 'Upfront payment when we support a Partner to introduce a homeowner.',
+    unlockNote: '🔓 Unlocks at 6 Personal Customers',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>We receive <strong>50%</strong> of the full Customer Bonus.</p>
-        <div style={{...box, fontSize:'0.8rem'}}>
+        <div style={{...box, fontSize:'0.8rem', marginBottom:'0.5rem'}}>
           <div style={{marginBottom:'0.25rem'}}>⏱️ <strong>First 45 days</strong> — in addition to their Customer Bonus</div>
-          <div>➡️ <strong>After 45 days</strong> — Customer Bonus is shared 50:50</div>
-        </div>
-        <div style={{...box, display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.25rem', marginBottom:'0.5rem'}}>
-          <span>1️⃣ service — £25</span><span>3️⃣ services — £125</span>
-          <span>2️⃣ services — £50</span><span>4️⃣ services — £150</span>
+          <div style={{marginBottom:'0.4rem'}}>➡️ <strong>After 45 days</strong> — Customer Bonus is shared 50:50</div>
+          <div style={{borderTop:'1px solid #c4b5fd',paddingTop:'0.4rem',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.25rem'}}>
+            <span>1️⃣ service — £25</span><span>3️⃣ services — £125</span>
+            <span>2️⃣ services — £50</span><span>4️⃣ services — £150</span>
+          </div>
         </div>
         <p style={closing}>✨ An extra income stream from helping Partners introduce homeowners.</p>
       </div>
@@ -169,17 +173,21 @@ const sections = [
   {
     id: 'mb',
     icon: <span style={{fontSize:'1.1rem'}}>🎓</span>,
-    title: 'Mentoring Bonus',
-    summary: 'Up to £400 when a Partner we introduce reaches QD.',
+    title: 'Mentoring Bonus †',
+    summary: 'Up to £400 when a Partner we introduce reaches QD*.',
+    unlockNote: '🔓 Unlocks at 3 Personal Customers',
     detail: (
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
-        <p style={{marginBottom:'0.25rem'}}>When a Partner reaches <strong>QD</strong>:</p>
+        <p style={{marginBottom:'0.25rem'}}>When a Partner reaches <strong>QD*</strong>:</p>
         <p style={{fontSize:'0.75rem',color:'#6b7280',margin:'0 0 0.5rem 0'}}>(6 personal customers + 1 Partner introduced)</p>
         <div style={box}>
-          <div>🎓 Mentoring Bonus — £100</div>
-          <div>🚀 Fast Start Bonus (within 30 days) — £300</div>
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>🎓 <span>Mentoring Bonus — £100</span></div>
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.25rem'}}>
+            <TrendingUp style={{...XS,color:'#374151'}} />
+            <span>Fast Start Mentoring Bonus in 30 days — £300</span>
+          </div>
           <div style={{borderTop:'1px solid #c4b5fd',marginTop:'0.5rem',paddingTop:'0.5rem',paddingLeft:'1.5rem'}}>
-            Total — <strong style={{color:'#6d28d9'}}>£400</strong>
+            Total — £400
           </div>
         </div>
         <p style={closing}>✨ Rewarding us for developing new Partners — with even more for Fast Start.</p>
@@ -230,11 +238,13 @@ const HowPaidPopup = ({ onClose }) => {
                 style={{width:'100%',display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.75rem',textAlign:'left',background:'none',border:'none',cursor:'pointer'}}
                 onClick={()=>toggle(s.id)}
               >
-                {/* icon is now a React element, not a string */}
                 <span style={{flexShrink:0,display:'flex',alignItems:'center'}}>{s.icon}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <p style={{fontWeight:'600',fontSize:'0.85rem',color:'#111827',margin:'0 0 0.1rem 0'}}>{s.title}</p>
-                  <p style={{fontSize:'0.78rem',color:'#6b7280',margin:0,lineHeight:'1.4',whiteSpace:'normal'}}>{s.summary}</p>
+                  <p style={{fontSize:'0.78rem',color:'#6b7280',margin:0,lineHeight:'1.4'}}>{s.summary}</p>
+                  {s.unlockNote && (
+                    <p style={{fontSize:'0.72rem',color:'#7c3aed',fontStyle:'italic',margin:'0.2rem 0 0 0',lineHeight:'1.3'}}>{s.unlockNote}</p>
+                  )}
                 </div>
                 {openId === s.id
                   ? <ChevronUp style={{...SM, color:'#9ca3af'}} />
@@ -248,8 +258,12 @@ const HowPaidPopup = ({ onClose }) => {
               )}
             </div>
           ))}
+
+          {/* Dagger footnote */}
+          <p style={{fontSize:'0.7rem',color:'#9ca3af',textAlign:'center',margin:'0.25rem 0 0.1rem',fontStyle:'italic'}}>
+            † Complete Fast Start Bonus on the main screen to see a worked example of Supporting and Mentoring Bonuses.
+          </p>
         </div>
-        {/* Footer removed */}
       </div>
     </div>
   );
@@ -417,7 +431,6 @@ const UWTracker = () => {
     return { border: '#7c3aed', text: '#6d28d9', bg: '#f5f3ff' };
   };
 
-  /* colour for locked banner items — grey when locked, pink when unlocked */
   const bannerCol = qualifiesForFastStart ? '#fbcfe8' : '#9ca3af';
 
   return (
@@ -586,7 +599,7 @@ const UWTracker = () => {
               ) : (
                 <div style={{padding:'1rem',background:'linear-gradient(to right,#7c3aed,#db2777)'}}>
                   <p style={{color:'white',fontWeight:'700',fontSize:'0.875rem',marginBottom:'0.25rem',marginTop:0}}>🔓 New Revenue Streams Unlocked — Worked Example</p>
-                  <p style={{color:'#fbcfe8',fontSize:'0.75rem',marginBottom:'0.75rem'}}>For each Partner you recruit and support to their QD Fast Start Bonus:</p>
+                  <p style={{color:'#fbcfe8',fontSize:'0.75rem',marginBottom:'0.75rem'}}>For each Partner you recruit and support to their QD* Fast Start Bonus:</p>
                   <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'0.5rem',padding:'0.75rem',marginBottom:'0.75rem'}}>
                     <div style={{display:'flex',justifyContent:'space-between',color:'white',fontSize:'0.875rem',marginBottom:'0.25rem'}}>
                       <span>They earn (just like you, above)</span>
