@@ -1,9 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>UW Partner Earnings Tool</title>
+<!-- v1772740110 -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,9 +14,17 @@
   @keyframes slideDown { 0%{opacity:0;transform:scale(0.95)} 100%{opacity:1;transform:scale(1)} }
   @keyframes confetti { 0%{transform:translateY(0) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(360deg);opacity:0} }
   @keyframes bounceOnce { 0%,100%{transform:translateY(0)} 25%{transform:translateY(-20px)} 50%{transform:translateY(0)} 75%{transform:translateY(-10px)} }
-  .animate-slideDown { animation: slideDown 0.2s ease-out forwards; }
-  .animate-confetti { animation: confetti 3s ease-in forwards; }
-  .animate-bounceOnce { animation: bounceOnce 0.6s ease-in-out; }
+  @keyframes fadeIn { 0%{opacity:0;transform:translateY(6px)} 100%{opacity:1;transform:translateY(0)} }
+  @keyframes slideInRight { 0%{opacity:0;transform:translateX(40px)} 100%{opacity:1;transform:translateX(0)} }
+  @keyframes slideInLeft  { 0%{opacity:0;transform:translateX(-40px)} 100%{opacity:1;transform:translateX(0)} }
+  @keyframes swipeHint { 0%,100%{transform:translateX(0);opacity:0.5} 50%{transform:translateX(8px);opacity:1} }
+  .animate-slideDown    { animation: slideDown 0.2s ease-out forwards; }
+  .animate-confetti     { animation: confetti 3s ease-in forwards; }
+  .animate-bounceOnce   { animation: bounceOnce 0.6s ease-in-out; }
+  .animate-fadeIn       { animation: fadeIn 0.25s ease-out forwards; }
+  .animate-slideInRight { animation: slideInRight 0.22s ease-out forwards; }
+  .animate-slideInLeft  { animation: slideInLeft  0.22s ease-out forwards; }
+  .swipe-hint           { animation: swipeHint 1.2s ease-in-out 3; }
   * { box-sizing: border-box; }
   @media (orientation: landscape) and (max-height: 500px) {
     .popup-inner { max-width: 58rem !important; height: 92vh !important; }
@@ -26,9 +36,14 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useCallback } = React;
+const { useState, useRef, useCallback, useEffect } = React;
 
+// ── Icons ──────────────────────────────────────────────────────────────────
 const defaultIconStyle = { width:'1rem', height:'1rem', flexShrink:0 };
+const SM  = { width:'1rem',    height:'1rem',    flexShrink:0 };
+const MD  = { width:'1.25rem', height:'1.25rem', flexShrink:0 };
+const XS  = { width:'0.875rem',height:'0.875rem',flexShrink:0 };
+
 const TrendingUp = ({ style }) => (
   <svg style={style||defaultIconStyle} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -65,10 +80,14 @@ const ChevronUp = ({ style }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
   </svg>
 );
-
-const SM  = { width:'1rem',    height:'1rem',    flexShrink:0 };
-const MD  = { width:'1.25rem', height:'1.25rem', flexShrink:0 };
-const XS  = { width:'0.875rem',height:'0.875rem',flexShrink:0 };
+const Calendar = ({ style }) => (
+  <svg style={style||defaultIconStyle} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2}/>
+    <line x1="16" y1="2" x2="16" y2="6" strokeWidth={2} strokeLinecap="round"/>
+    <line x1="8" y1="2" x2="8" y2="6" strokeWidth={2} strokeLinecap="round"/>
+    <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2}/>
+  </svg>
+);
 
 const RcwIcon = ({ style }) => (
   <svg style={style||SM} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,48 +95,50 @@ const RcwIcon = ({ style }) => (
   </svg>
 );
 
+// ── Shared styles ──────────────────────────────────────────────────────────
 const box  = { background:'#f5f3ff', borderRadius:'0.5rem', padding:'0.75rem', marginBottom:'0.5rem' };
 const closing = { fontStyle:'italic', fontWeight:'700', color:'#111827', margin:0 };
 const unlockStyle = { fontStyle:'italic', fontSize:'0.72rem', color:'#7c3aed', margin:'0.2rem 0 0.35rem 0', lineHeight:'1.3' };
 
+// ── CB calculation ─────────────────────────────────────────────────────────
+const calcCB = (type, services) => {
+  if (type !== 'homeowner') return 0;
+  return [0, 50, 100, 250, 300][services] || 0;
+};
+
+// ── HAB calculation helper ─────────────────────────────────────────────────
+const calcHAB = (qualifyingCount) => {
+  if (qualifyingCount >= 4) return 100;
+  if (qualifyingCount >= 2) return 50;
+  return 0;
+};
+
+// ── How Paid popup ─────────────────────────────────────────────────────────
 const scbSummary = (isOpen) => (
   <span>
     Upfront payment when we support a Partner to introduce a homeowner.{' '}
-    <span style={{
-      fontStyle: 'italic',
-      fontSize: '0.72rem',
-      color: '#7c3aed',
-      opacity: isOpen ? 1 : 0,
-      transition: 'opacity 0.15s',
-      userSelect: isOpen ? 'auto' : 'none',
-    }}>🔓 Unlocks at 6 Personal Customers.</span>
+    <span style={{ fontStyle:'italic', fontSize:'0.72rem', color:'#7c3aed', opacity:isOpen?1:0, transition:'opacity 0.15s', userSelect:isOpen?'auto':'none' }}>
+      🔓 Unlocks at 6 Personal Customers.
+    </span>
   </span>
 );
-
 const mbSummary = (isOpen) => (
   <span>
     Up to £400 when a Partner we introduce reaches QD*.<br/>
-    <span style={{
-      fontStyle: 'italic',
-      fontSize: '0.72rem',
-      color: '#7c3aed',
-      opacity: isOpen ? 1 : 0,
-      transition: 'opacity 0.15s',
-      userSelect: isOpen ? 'auto' : 'none',
-    }}>🔓 Unlocks at 3 Personal Customers.</span>
+    <span style={{ fontStyle:'italic', fontSize:'0.72rem', color:'#7c3aed', opacity:isOpen?1:0, transition:'opacity 0.15s', userSelect:isOpen?'auto':'none' }}>
+      🔓 Unlocks at 3 Personal Customers.
+    </span>
   </span>
 );
 
 const sections = [
   {
-    id: 'cb',
-    icon: <span style={{fontSize:'1.1rem'}}>💷</span>,
-    title: 'Customer Bonus',
-    summary: 'Upfront payment when we introduce a homeowner customer.',
-    detail: (
+    id:'cb', icon:<span style={{fontSize:'1.1rem'}}>💷</span>, title:'Customer Bonus',
+    summary:'Upfront payment when we introduce a homeowner customer.',
+    detail:(
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>Paid when services go live:</p>
-        <div style={{...box, display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.25rem'}}>
+        <div style={{...box,display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.25rem'}}>
           <span>1️⃣ service — £50</span><span>3️⃣ services — £250</span>
           <span>2️⃣ services — £100</span><span>4️⃣ services — £300</span>
         </div>
@@ -126,11 +147,9 @@ const sections = [
     ),
   },
   {
-    id: 'hab',
-    icon: <span style={{fontSize:'1.1rem'}}>🔥</span>,
-    title: 'High Activity Bonus',
-    summary: 'Extra reward for multiple 3+ service homeowners in one calendar month.',
-    detail: (
+    id:'hab', icon:<span style={{fontSize:'1.1rem'}}>🔥</span>, title:'High Activity Bonus',
+    summary:'Extra reward for multiple 3+ service homeowners in one calendar month.',
+    detail:(
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>On top of Customer Bonus:</p>
         <div style={box}>
@@ -142,28 +161,22 @@ const sections = [
     ),
   },
   {
-    id: 'ri',
-    icon: <RcwIcon style={{...SM, color:'#2563eb'}} />,
-    title: 'Recurring (Residual) Income',
-    summary: 'Ongoing monthly income from our personal customers and our team\'s customers.',
-    detail: (
+    id:'ri', icon:<RcwIcon style={{...SM,color:'#2563eb'}}/>, title:'Recurring (Residual) Income',
+    summary:"Ongoing monthly income from our personal customers and our team's customers.",
+    detail:(
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>A recurring profit share of customers' bills which increases as customers add more services.</p>
-        <div style={{...box, marginBottom:'0.5rem'}}>
+        <div style={{...box,marginBottom:'0.5rem'}}>
           <p style={unlockStyle}>🔓 Unlocks at 3 Personal Customers</p>
           <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
-            <RcwIcon style={{...XS, color:'#2563eb'}} />
-            <span>👥</span>
-            <strong>Team (Group) Customers</strong>
+            <RcwIcon style={{...XS,color:'#2563eb'}}/><span>👥</span><strong>Team (Group) Customers</strong>
             <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— pence per service, typically</span>
           </p>
           <div style={{marginBottom:'0.5rem'}}>• 30–50p /month per customer</div>
           <div style={{borderTop:'1px solid #c4b5fd',paddingTop:'0.4rem'}}>
             <p style={unlockStyle}>🔓 Unlocks at 6 Personal Customers</p>
             <p style={{margin:'0 0 0.35rem 0',display:'flex',alignItems:'center',gap:'0.3rem'}}>
-              <RcwIcon style={{...XS, color:'#2563eb'}} />
-              <span>👤</span>
-              <strong>Personal Customers</strong>
+              <RcwIcon style={{...XS,color:'#2563eb'}}/><span>👤</span><strong>Personal Customers</strong>
               <span style={{fontWeight:'400',fontStyle:'italic',color:'#6b7280',fontSize:'0.8rem'}}>— % of bill, typically</span>
             </p>
             <div>• Tenant — £2–£3 /month <span style={{color:'#6b7280',fontSize:'0.72rem'}}>(after first bill paid)</span></div>
@@ -175,14 +188,12 @@ const sections = [
     ),
   },
   {
-    id: 'scb',
-    icon: <span style={{fontSize:'1.1rem'}}>🤝</span>,
-    title: 'Supporting Customer Bonus †',
-    summary: scbSummary,
-    detail: (
+    id:'scb', icon:<span style={{fontSize:'1.1rem'}}>🤝</span>, title:'Supporting Customer Bonus †',
+    summary:scbSummary,
+    detail:(
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem'}}>We receive <strong>50%</strong> of the full Customer Bonus.</p>
-        <div style={{...box, fontSize:'0.8rem', marginBottom:'0.5rem'}}>
+        <div style={{...box,fontSize:'0.8rem',marginBottom:'0.5rem'}}>
           <div style={{marginBottom:'0.25rem'}}>⏱️ <strong>First 45 days</strong> — in addition to their Customer Bonus</div>
           <div style={{marginBottom:'0.4rem'}}>➡️ <strong>After 45 days</strong> — Customer Bonus is shared 50:50</div>
           <div style={{borderTop:'1px solid #c4b5fd',paddingTop:'0.4rem',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.25rem'}}>
@@ -195,11 +206,9 @@ const sections = [
     ),
   },
   {
-    id: 'mb',
-    icon: <span style={{fontSize:'1.1rem'}}>🎓</span>,
-    title: 'Mentor Bonus †',
-    summary: mbSummary,
-    detail: (
+    id:'mb', icon:<span style={{fontSize:'1.1rem'}}>🎓</span>, title:'Mentor Bonus †',
+    summary:mbSummary,
+    detail:(
       <div style={{fontSize:'0.875rem',color:'#374151'}}>
         <p style={{marginBottom:'0.5rem',fontWeight:'600'}}>QD* = 6 Personal Customers + 1 Partner introduced</p>
         <div style={box}>
@@ -207,12 +216,9 @@ const sections = [
             <span>🎓</span><span>Mentor Bonus — £100</span>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'0.4rem',marginTop:'0.25rem'}}>
-            <TrendingUp style={{...XS,color:'#374151'}} />
-            <span>30 days Mentor Fast Starter Bonus — £300</span>
+            <TrendingUp style={{...XS,color:'#374151'}}/><span>30 days Mentor Fast Starter Bonus — £300</span>
           </div>
-          <div style={{borderTop:'1px solid #c4b5fd',marginTop:'0.5rem',paddingTop:'0.5rem',paddingLeft:'1.5rem'}}>
-            Total — £400 per Partner
-          </div>
+          <div style={{borderTop:'1px solid #c4b5fd',marginTop:'0.5rem',paddingTop:'0.5rem',paddingLeft:'1.5rem'}}>Total — £400 per Partner</div>
         </div>
         <p style={closing}>✨ Rewarding us for developing new Partners — with even more for Fast Starter.</p>
       </div>
@@ -223,66 +229,42 @@ const sections = [
 const HowPaidPopup = ({ onClose }) => {
   const [openId, setOpenId] = useState(null);
   const headerRefs = useRef({});
-
   const toggle = useCallback((id) => {
     const opening = openId !== id;
     setOpenId(opening ? id : null);
-    if (opening && headerRefs.current[id]) {
-      headerRefs.current[id].scrollIntoView({ behavior: 'instant', block: 'start' });
-    }
+    if (opening && headerRefs.current[id]) headerRefs.current[id].scrollIntoView({ behavior:'instant', block:'start' });
   }, [openId]);
-
   return (
-    <div
-      style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'0.75rem'}}
-      onClick={onClose}
-    >
-      <div
-        className="popup-inner"
-        style={{background:'white',borderRadius:'0.75rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'28rem',width:'100%',display:'flex',flexDirection:'column',height:'85vh'}}
-        onClick={e=>e.stopPropagation()}
-      >
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'0.75rem'}} onClick={onClose}>
+      <div className="popup-inner" style={{background:'white',borderRadius:'0.75rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'28rem',width:'100%',display:'flex',flexDirection:'column',height:'85vh'}} onClick={e=>e.stopPropagation()}>
         <div style={{padding:'1rem 1rem 0.6rem',borderBottom:'1px solid #f3f4f6',display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexShrink:0}}>
           <div>
             <h3 style={{fontSize:'1.05rem',fontWeight:'700',color:'#111827',margin:0}}>How Are UW Partners Paid?</h3>
             <p style={{fontSize:'0.75rem',color:'#6b7280',marginTop:'0.2rem',marginBottom:0}}>We earn upfront income — and recurring income over time.</p>
           </div>
           <button onClick={onClose} style={{marginLeft:'0.75rem',width:'1.75rem',height:'1.75rem',borderRadius:'50%',background:'#f3f4f6',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-            <X style={{...XS, color:'#4b5563'}} />
+            <X style={{...XS,color:'#4b5563'}}/>
           </button>
         </div>
-
         <div className="accordion-list" style={{overflowY:'auto',flex:1,padding:'0.6rem',display:'flex',flexDirection:'column',gap:'0.4rem'}}>
           {sections.map(s => {
             const isOpen = openId === s.id;
             return (
               <div key={s.id} style={{border:'1px solid #e5e7eb',borderRadius:'0.6rem',overflow:'hidden',background:'white'}}>
-                <button
-                  ref={el => headerRefs.current[s.id] = el}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.75rem',textAlign:'left',background:'none',border:'none',cursor:'pointer'}}
-                  onClick={()=>toggle(s.id)}
-                >
+                <button ref={el=>headerRefs.current[s.id]=el} style={{width:'100%',display:'flex',alignItems:'center',gap:'0.6rem',padding:'0.6rem 0.75rem',textAlign:'left',background:'none',border:'none',cursor:'pointer'}} onClick={()=>toggle(s.id)}>
                   <span style={{flexShrink:0,display:'flex',alignItems:'center'}}>{s.icon}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <p style={{fontWeight:'600',fontSize:'0.85rem',color:'#111827',margin:'0 0 0.1rem 0'}}>{s.title}</p>
-                    <p style={{fontSize:'0.78rem',color:'#6b7280',margin:0,lineHeight:'1.4'}}>
-                      {typeof s.summary === 'function' ? s.summary(isOpen) : s.summary}
-                    </p>
+                    <p style={{fontSize:'0.78rem',color:'#6b7280',margin:0,lineHeight:'1.4'}}>{typeof s.summary === 'function' ? s.summary(isOpen) : s.summary}</p>
                   </div>
-                  {isOpen
-                    ? <ChevronUp style={{...SM, color:'#9ca3af'}} />
-                    : <ChevronDown style={{...SM, color:'#9ca3af'}} />
-                  }
+                  {isOpen ? <ChevronUp style={{...SM,color:'#9ca3af'}}/> : <ChevronDown style={{...SM,color:'#9ca3af'}}/>}
                 </button>
                 {isOpen && (
-                  <div style={{padding:'0.25rem 0.75rem 0.75rem',borderTop:'1px solid #f3f4f6',background:'#faf9ff'}}>
-                    {s.detail}
-                  </div>
+                  <div style={{padding:'0.25rem 0.75rem 0.75rem',borderTop:'1px solid #f3f4f6',background:'#faf9ff'}}>{s.detail}</div>
                 )}
               </div>
             );
           })}
-
           <p style={{fontSize:'0.7rem',color:'#9ca3af',textAlign:'center',margin:'0.25rem 0 0.1rem',fontStyle:'italic',lineHeight:'1.6'}}>
             † Complete Fast Starter Bonus on the main screen to see<br/>a worked example of Supporting and Mentor Bonuses.
           </p>
@@ -292,50 +274,52 @@ const HowPaidPopup = ({ onClose }) => {
   );
 };
 
-const UWTracker = () => {
+// ── Empty customer factory ─────────────────────────────────────────────────
+const emptyCustomer = () => ({ type: null, services: 0, isPartner: false, supported: false });
+
+// ── Date helpers ───────────────────────────────────────────────────────────
+const parseLocalDate = (str) => {
+  // str is YYYY-MM-DD; create date in local timezone
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const addDays = (date, n) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+};
+
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const formatDate = (date) => date.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+
+// ── SHOW MODE (original tool, untouched logic) ─────────────────────────────
+const ShowMode = ({ showInfoPopup, setShowInfoPopup }) => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [showPartnerPrompt, setShowPartnerPrompt] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [cardFlipped, setCardFlipped] = useState(false);
   const [includeYou, setIncludeYou] = useState(true);
   const previouslyQualified = useRef(false);
 
   const [customers, setCustomers] = useState([
-    { type: 'own', services: 0, isPartner: false },
-    { type: null, services: 0, isPartner: false },
-    { type: null, services: 0, isPartner: false },
-    { type: null, services: 0, isPartner: false },
-    { type: null, services: 0, isPartner: false },
-    { type: null, services: 0, isPartner: false }
+    { type:'own', services:0, isPartner:false },
+    emptyCustomer(), emptyCustomer(), emptyCustomer(), emptyCustomer(), emptyCustomer()
   ]);
 
   const calculateCB = (customer, index) => {
-    if (!includeYou && index === 0) {
-      if (customer.type === 'homeowner') {
-        if (customer.services === 1) return 50;
-        if (customer.services === 2) return 100;
-        if (customer.services === 3) return 250;
-        if (customer.services === 4) return 300;
-      }
-      return 0;
-    }
+    if (!includeYou && index === 0) return calcCB(customer.type === 'own' ? null : customer.type, customer.services);
     if (customer.type === 'own' || customer.type === 'renting') return 0;
-    if (customer.type === 'homeowner') {
-      if (customer.services === 1) return 50;
-      if (customer.services === 2) return 100;
-      if (customer.services === 3) return 250;
-      if (customer.services === 4) return 300;
-    }
-    return 0;
+    return calcCB(customer.type, customer.services);
   };
 
   const highActivityCustomers = customers.filter((c, i) => {
     if (includeYou) return i > 0 && c.type === 'homeowner' && (c.services === 3 || c.services === 4);
     return c.type === 'homeowner' && (c.services === 3 || c.services === 4);
   }).length;
-  const habPerCustomer = highActivityCustomers >= 4 ? 100 : highActivityCustomers >= 2 ? 50 : 0;
+  const habPerCustomer = calcHAB(highActivityCustomers);
   const totalHAB = highActivityCustomers * habPerCustomer;
   const totalCB = customers.reduce((sum, c, i) => sum + calculateCB(c, i), 0);
   const hasPartner = customers.some((c, i) => includeYou ? i > 0 && c.isPartner : c.isPartner);
@@ -350,62 +334,54 @@ const UWTracker = () => {
 
   const getCircleOpacity = (index) => {
     if (index === 0 && includeYou) return 1;
-    if (!includeYou) {
-      for (let i = 0; i < index; i++) if (customers[i].type === null) return 0.3;
-      return 1;
-    }
-    for (let i = 1; i < index; i++) if (customers[i].type === null) return 0.3;
+    if (!includeYou) { for (let i=0;i<index;i++) if (customers[i].type===null) return 0.3; return 1; }
+    for (let i=1;i<index;i++) if (customers[i].type===null) return 0.3;
     return 1;
   };
-
   const canSelectCircle = (index) => {
     if (index === 0 && includeYou) return false;
-    if (!includeYou) {
-      if (allCirclesFilled) return true;
-      for (let i = 0; i < index; i++) if (customers[i].type === null) return false;
-      return true;
-    }
+    if (!includeYou) { if (allCirclesFilled) return true; for (let i=0;i<index;i++) if (customers[i].type===null) return false; return true; }
     if (allCirclesFilled) return true;
-    for (let i = 1; i < index; i++) if (customers[i].type === null) return false;
+    for (let i=1;i<index;i++) if (customers[i].type===null) return false;
     return true;
   };
 
   const handlePartnerBadgeClick = (e, index) => {
     e.stopPropagation();
-    if ((index === 0 && includeYou) || customers[index].type === null) return;
+    if ((index===0 && includeYou) || customers[index].type===null) return;
     const wasQualified = qualifiesForFastStarter;
     const nc = [...customers];
     nc[index] = {...nc[index], isPartner: !nc[index].isPartner};
     setCustomers(nc);
-    const nowAllFilled = nc.every(c => c.type !== null);
-    const nowHasPartner = nc.some((c, i) => includeYou ? i > 0 && c.isPartner : c.isPartner);
+    const nowAllFilled = nc.every(c=>c.type!==null);
+    const nowHasPartner = nc.some((c,i)=>includeYou?i>0&&c.isPartner:c.isPartner);
     const nowQualifies = nowAllFilled && nowHasPartner;
     if (!wasQualified && nowQualifies && !previouslyQualified.current) {
       previouslyQualified.current = true;
-      setTimeout(() => { setShowCelebration(true); setTimeout(() => setShowCelebration(false), 3000); }, 200);
+      setTimeout(()=>{ setShowCelebration(true); setTimeout(()=>setShowCelebration(false),3000); },200);
     }
     if (!nowQualifies) previouslyQualified.current = false;
     setShowPartnerPrompt(false);
   };
 
   const handleCircleClick = (index) => {
-    if ((index === 0 && includeYou) || !canSelectCircle(index)) return;
+    if ((index===0 && includeYou) || !canSelectCircle(index)) return;
     setSelectedCircle(index);
   };
 
   const setCustomerType = (type, services) => {
-    if (selectedCircle === null) return;
+    if (selectedCircle===null) return;
     const wasQualified = qualifiesForFastStarter;
     const nc = [...customers];
-    nc[selectedCircle] = { type, services: services || 0, isPartner: nc[selectedCircle].isPartner };
+    nc[selectedCircle] = { type, services:services||0, isPartner:nc[selectedCircle].isPartner };
     setCustomers(nc);
     setSelectedCircle(null);
-    const nowAllFilled = nc.every(c => c.type !== null);
-    const nowHasPartner = nc.some((c, i) => includeYou ? i > 0 && c.isPartner : c.isPartner);
+    const nowAllFilled = nc.every(c=>c.type!==null);
+    const nowHasPartner = nc.some((c,i)=>includeYou?i>0&&c.isPartner:c.isPartner);
     const nowQualifies = nowAllFilled && nowHasPartner;
     if (!wasQualified && nowQualifies && !previouslyQualified.current) {
       previouslyQualified.current = true;
-      setTimeout(() => { setShowCelebration(true); setTimeout(() => setShowCelebration(false), 3000); }, 200);
+      setTimeout(()=>{ setShowCelebration(true); setTimeout(()=>setShowCelebration(false),3000); },200);
     } else if (nowAllFilled && !nowHasPartner) {
       setShowPartnerPrompt(true);
     }
@@ -413,9 +389,9 @@ const UWTracker = () => {
   };
 
   const removeCustomer = () => {
-    if (selectedCircle === null) return;
+    if (selectedCircle===null) return;
     const nc = [...customers];
-    nc[selectedCircle] = { type: null, services: 0, isPartner: false };
+    nc[selectedCircle] = emptyCustomer();
     setCustomers(nc);
     setSelectedCircle(null);
     previouslyQualified.current = false;
@@ -423,12 +399,8 @@ const UWTracker = () => {
 
   const resetTracking = () => {
     setCustomers([
-      { type: includeYou ? 'own' : null, services: 0, isPartner: false },
-      { type: null, services: 0, isPartner: false },
-      { type: null, services: 0, isPartner: false },
-      { type: null, services: 0, isPartner: false },
-      { type: null, services: 0, isPartner: false },
-      { type: null, services: 0, isPartner: false }
+      { type:includeYou?'own':null, services:0, isPartner:false },
+      emptyCustomer(), emptyCustomer(), emptyCustomer(), emptyCustomer(), emptyCustomer()
     ]);
     setSelectedCircle(null); setShowPartnerPrompt(false);
     setShowResetConfirm(false); setCardFlipped(false);
@@ -439,28 +411,26 @@ const UWTracker = () => {
     const niy = !includeYou;
     setIncludeYou(niy);
     const nc = [...customers];
-    nc[0] = { type: niy ? 'own' : null, services: 0, isPartner: false };
+    nc[0] = { type:niy?'own':null, services:0, isPartner:false };
     setCustomers(nc);
     setSelectedCircle(null);
     previouslyQualified.current = false;
   };
 
-  const ordinal = (n) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
-
+  const ordinal = (n) => n===1?'1st':n===2?'2nd':n===3?'3rd':`${n}th`;
   const circleColor = (c) => {
-    if (c.type === null) return { border: '#d1d5db', text: '#9ca3af', bg: '#f9fafb' };
-    if (c.type === 'own') return { border: '#9ca3af', text: '#374151', bg: '#f3f4f6' };
-    if (c.type === 'renting') return { border: '#2563eb', text: '#1d4ed8', bg: '#eff6ff' };
-    return { border: '#7c3aed', text: '#6d28d9', bg: '#f5f3ff' };
+    if (c.type===null) return { border:'#d1d5db', text:'#9ca3af', bg:'#f9fafb' };
+    if (c.type==='own') return { border:'#9ca3af', text:'#374151', bg:'#f3f4f6' };
+    if (c.type==='renting') return { border:'#2563eb', text:'#1d4ed8', bg:'#eff6ff' };
+    return { border:'#7c3aed', text:'#6d28d9', bg:'#f5f3ff' };
   };
-
   const bannerCol = qualifiesForFastStarter ? '#fbcfe8' : '#9ca3af';
 
   return (
-    <div style={{minHeight:'100vh',background:'linear-gradient(135deg, #fdf2f8, #f5f3ff)',padding:'1rem'}}>
+    <>
       {showCelebration && (
         <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:50}}>
-          {[...Array(50)].map((_, i) => (
+          {[...Array(50)].map((_,i)=>(
             <div key={i} className="animate-confetti" style={{position:'absolute',left:`${Math.random()*100}%`,top:'-10%',animationDelay:`${Math.random()*0.5}s`,animationDuration:`${2+Math.random()}s`}}>
               <div style={{color:'#facc15',fontSize:`${Math.random()*20+10}px`,transform:`rotate(${Math.random()*360}deg)`}}>✨</div>
             </div>
@@ -468,214 +438,183 @@ const UWTracker = () => {
         </div>
       )}
 
-      <div style={{maxWidth:'42rem',margin:'0 auto'}}>
-        <div style={{marginBottom:'1.5rem'}}>
-          <h1 style={{fontSize:'1.5rem',fontWeight:'700',color:'#1f2937',marginBottom:'0.5rem',textAlign:'center'}}>UW Partner Earnings Tool</h1>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'1rem'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-              <button onClick={toggleIncludeYou} style={{position:'relative',display:'inline-flex',height:'1.5rem',width:'2.75rem',alignItems:'center',borderRadius:'9999px',border:'none',cursor:'pointer',background:includeYou?'#22c55e':'#d1d5db',transition:'background 0.2s'}}>
-                <span style={{display:'inline-block',height:'1rem',width:'1rem',transform:includeYou?'translateX(1.5rem)':'translateX(0.25rem)',borderRadius:'50%',background:'white',transition:'transform 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}></span>
-              </button>
-              <span style={{fontSize:'0.875rem',fontWeight:'600',color:'#374151'}}>You</span>
-            </div>
-            <p style={{fontSize:'0.875rem',color:'#6b7280',flex:1,textAlign:'center'}}>
-              Explore what <strong>{includeYou ? 'five' : 'six'}</strong> customers could earn you in the first 30 days
-            </p>
-            <div style={{width:'5rem'}}></div>
+      <div style={{marginBottom:'1.5rem'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'1rem'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+            <button onClick={toggleIncludeYou} style={{position:'relative',display:'inline-flex',height:'1.5rem',width:'2.75rem',alignItems:'center',borderRadius:'9999px',border:'none',cursor:'pointer',background:includeYou?'#22c55e':'#d1d5db',transition:'background 0.2s'}}>
+              <span style={{display:'inline-block',height:'1rem',width:'1rem',transform:includeYou?'translateX(1.5rem)':'translateX(0.25rem)',borderRadius:'50%',background:'white',transition:'transform 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}></span>
+            </button>
+            <span style={{fontSize:'0.875rem',fontWeight:'600',color:'#374151'}}>You</span>
           </div>
-        </div>
-
-        <div style={{background:'white',borderRadius:'1rem',boxShadow:'0 4px 16px rgba(0,0,0,0.08)',padding:'1.5rem'}}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1rem'}}>
-            {customers.map((customer, index) => {
-              const col = circleColor(customer);
-              const cb = calculateCB(customer, index);
-              const showHAB = customer.type === 'homeowner' && (customer.services === 3 || customer.services === 4) && highActivityCustomers >= 2;
-              return (
-                <div key={index} style={{display:'flex',flexDirection:'column',alignItems:'center',position:'relative'}}>
-                  <div
-                    onClick={() => handleCircleClick(index)}
-                    style={{width:'5rem',height:'5rem',borderRadius:'50%',border:`4px solid ${col.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:'1.125rem',fontWeight:'700',position:'relative',background:col.bg,color:col.text,cursor:canSelectCircle(index)?'pointer':'not-allowed',opacity:getCircleOpacity(index),transition:'transform 0.15s',boxSizing:'border-box'}}
-                  >
-                    {(index === 0 && includeYou) ? (
-                      <span style={{fontSize:'1rem',fontWeight:'700'}}>You</span>
-                    ) : customer.type ? (
-                      <>
-                        <span style={{fontSize:'0.875rem',fontWeight:'700'}}>£{cb.toLocaleString()}</span>
-                        {showHAB && (
-                          <div style={{position:'absolute',top:'-0.25rem',right:'-0.25rem',padding:'0.125rem 0.25rem',background:'#f97316',color:'white',fontSize:'0.625rem',fontWeight:'700',borderRadius:'0.25rem',zIndex:10}}>+£{habPerCustomer}</div>
-                        )}
-                        <div
-                          onClick={(e) => handlePartnerBadgeClick(e, index)}
-                          style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:`2px solid ${customer.isPartner?'#ca8a04':'#9ca3af'}`,display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,cursor:'pointer',background:customer.isPartner?'#facc15':'#e5e7eb',transition:'transform 0.15s'}}
-                        >
-                          <span style={{fontSize:'0.625rem',fontWeight:'700',color:customer.isPartner?'#713f12':'#6b7280'}}>P</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span style={{fontSize:'0.875rem'}}>{includeYou ? ordinal(index) : ordinal(index+1)}</span>
-                        <div style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:'2px solid #9ca3af',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,background:'#e5e7eb'}}>
-                          <span style={{fontSize:'0.625rem',fontWeight:'700',color:'#6b7280'}}>P</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {showPartnerPrompt && allCirclesFilled && !hasPartner && (
-            <div style={{marginBottom:'1rem',padding:'1rem',background:'linear-gradient(to right,#facc15,#f59e0b)',borderRadius:'0.5rem',boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.75rem',flexWrap:'wrap'}}>
-                <span style={{fontSize:'0.875rem',fontWeight:'700',color:'#713f12'}}>Press above to upgrade one customer to Partner:</span>
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                  <div style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'#e5e7eb',border:'2px solid #9ca3af',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:'0.625rem',fontWeight:'700',color:'#6b7280'}}>P</span></div>
-                  <span style={{fontSize:'1.25rem'}}>→</span>
-                  <div style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'#facc15',border:'2px solid #ca8a04',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:'0.625rem',fontWeight:'700',color:'#713f12'}}>P</span></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div style={{display:'flex',flexDirection:'column',gap:'0.75rem'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`4px solid ${totalCB>0?'#7c3aed':'#d1d5db'}`,background:totalCB>0?'#f5f3ff':'#f9fafb'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                <span style={{fontSize:'1.25rem',filter:totalCB>0?'none':'grayscale(1)',opacity:totalCB>0?1:0.4}}>💷</span>
-                <span style={{fontWeight:'600',color:totalCB>0?'#7c3aed':'#4b5563'}}>Customer Bonus:</span>
-              </div>
-              <span style={{fontSize:'1.25rem',fontWeight:'700',color:totalCB>0?'#6d28d9':'#9ca3af'}}>£{totalCB.toLocaleString()}</span>
-            </div>
-
-            {highActivityCustomers >= 2 && (
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:'4px solid #f97316',background:'#fff7ed'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                  <span style={{fontSize:'1.25rem'}}>🔥</span>
-                  <span style={{fontWeight:'600',color:'#ea580c'}}>High Activity Bonus:</span>
-                </div>
-                <span style={{fontSize:'1.25rem',fontWeight:'700',color:'#ea580c'}}>£{totalHAB.toLocaleString()}</span>
-              </div>
-            )}
-
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`2px solid ${qualifiesForFastStarter?'#86efac':'#e5e7eb'}`,background:qualifiesForFastStarter?'#f0fdf4':'#f9fafb'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                <TrendingUp style={{...MD, color:qualifiesForFastStarter?'#16a34a':'#9ca3af'}} />
-                <span style={{fontWeight:'600',color:qualifiesForFastStarter?'#16a34a':'#374151'}}>Fast Starter Bonus:</span>
-              </div>
-              <span style={{fontSize:'1.25rem',fontWeight:'700',color:qualifiesForFastStarter?'#16a34a':'#9ca3af'}}>£{fastStarterBonus.toLocaleString()}</span>
-            </div>
-
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'1rem',borderRadius:'0.5rem',boxShadow:'0 2px 8px rgba(0,0,0,0.15)',color:'white',position:'relative',overflow:'hidden'}}>
-              <div style={{position:'absolute',inset:0,background:grandTotal>0?'linear-gradient(to right,#7c3aed,#db2777)':'#9ca3af'}}></div>
-              <div style={{display:'flex',alignItems:'center',gap:'0.5rem',position:'relative',zIndex:1}}>
-                <span style={{fontWeight:'700',fontSize:'1.125rem'}}>TOTAL EARNINGS:</span>
-                <button onClick={(e) => { e.stopPropagation(); setShowInfoPopup(true); }} style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'rgba(255,255,255,0.3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
-                  <Info style={{...XS, color:'white'}} />
-                </button>
-              </div>
-              <span style={{fontSize:'1.5rem',fontWeight:'700',position:'relative',zIndex:1}}>£{grandTotal.toLocaleString()}</span>
-            </div>
-
-            {tenantCount > 0 && (
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:'4px solid #2563eb',background:'#eff6ff'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                  <RefreshCw style={{...MD, color:'#2563eb'}} />
-                  <span style={{fontWeight:'600',color:'#374151'}}>Recurring Income:</span>
-                </div>
-                <div style={{textAlign:'right'}}>
-                  <span style={{fontSize:'1.25rem',fontWeight:'700',color:'#2563eb'}}>£{residualIncome.toFixed(2)}/m</span>
-                  <span style={{display:'block',fontSize:'0.75rem',color:'#3b82f6'}}>(£{(residualIncome*12).toLocaleString()}/yr)</span>
-                </div>
-              </div>
-            )}
-
-            <div
-              onClick={() => qualifiesForFastStarter && setCardFlipped(!cardFlipped)}
-              style={{borderRadius:'0.75rem',border:`2px solid ${qualifiesForFastStarter?'#a78bfa':'#e5e7eb'}`,overflow:'hidden',cursor:qualifiesForFastStarter?'pointer':'not-allowed'}}
-            >
-              {!cardFlipped ? (
-                <div style={{padding:'1rem',background:qualifiesForFastStarter?'linear-gradient(to right,#7c3aed,#db2777)':'#f3f4f6'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.75rem'}}>
-                    {qualifiesForFastStarter
-                      ? <span style={{fontSize:'1.125rem',lineHeight:1}}>🔓</span>
-                      : <Lock style={{...SM, color:'#9ca3af'}} />
-                    }
-                    <span style={{fontWeight:'700',fontSize:'1rem',color:qualifiesForFastStarter?'white':'#9ca3af'}}>New Revenue Streams Unlocked</span>
-                  </div>
-                  <div style={{fontSize:'0.875rem',color:bannerCol,display:'flex',flexDirection:'column',gap:'0.25rem'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <span style={{filter:qualifiesForFastStarter?'none':'grayscale(1)',opacity:qualifiesForFastStarter?1:0.5}}>🤝</span>
-                      <span>Supporting Customer</span>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <span style={{filter:qualifiesForFastStarter?'none':'grayscale(1)',opacity:qualifiesForFastStarter?1:0.5}}>🎓</span>
-                      <span>Mentor</span>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
-                      <TrendingUp style={{...SM, color:bannerCol}} />
-                      <span>{'  '}Fast Starter Mentor</span>
-                    </div>
-                  </div>
-                  {qualifiesForFastStarter && <p style={{fontSize:'0.75rem',color:'#fbcfe8',fontStyle:'italic',textAlign:'center',marginTop:'0.75rem',marginBottom:0}}>Tap to see worked example</p>}
-                </div>
-              ) : (
-                <div style={{padding:'1rem',background:'linear-gradient(to right,#7c3aed,#db2777)'}}>
-                  <p style={{color:'white',fontWeight:'700',fontSize:'0.875rem',marginBottom:'0.25rem',marginTop:0}}>🔓 New Revenue Streams Unlocked — Worked Example</p>
-                  <p style={{color:'#fbcfe8',fontSize:'0.75rem',marginBottom:'0.75rem'}}>For each Partner you recruit and support to their QD* Fast Starter Bonus:</p>
-                  <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'0.5rem',padding:'0.75rem',marginBottom:'0.75rem'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',color:'white',fontSize:'0.875rem',marginBottom:'0.25rem'}}>
-                      <span>They earn (just like you, above)</span>
-                      <span style={{fontWeight:'700'}}>£{grandTotal.toLocaleString()}</span>
-                    </div>
-                    <div style={{borderTop:'1px solid rgba(255,255,255,0.3)',paddingTop:'0.25rem',display:'flex',justifyContent:'space-between',fontSize:'0.875rem'}}>
-                      <span style={{color:'#fbcfe8'}}>You earn (in this example)</span>
-                      <span style={{fontWeight:'700',color:'#fde68a'}}>£{partnerTotalEarnings.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <p style={{color:'white',fontSize:'0.75rem',fontWeight:'600',marginBottom:'0.25rem'}}>Made up of:</p>
-                  {[
-                    {icon:'🤝',label:'Supporting Customer Bonuses',val:supportingBonus},
-                    {icon:'🎓',label:'Mentor Bonus',val:100},
-                    {icon:null,label:'Fast Starter Mentor Bonus',val:300},
-                  ].map(r => (
-                    <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'0.875rem',background:'rgba(255,255,255,0.1)',borderRadius:'0.25rem',padding:'0.25rem 0.5rem',marginBottom:'0.25rem'}}>
-                      <span style={{display:'flex',alignItems:'center',color:'#fbcfe8'}}>
-                        {r.icon
-                          ? <span style={{marginRight:'0.375rem'}}>{r.icon}</span>
-                          : <span style={{display:'inline-flex',alignItems:'center',marginRight:'0.375rem'}}><TrendingUp style={{...XS, color:'#fbcfe8'}} /></span>
-                        }
-                        {'  '}{r.label}
-                      </span>
-                      <span style={{color:'white',fontWeight:'700'}}>£{r.val.toLocaleString()}</span>
-                    </div>
-                  ))}
-                  <p style={{fontSize:'0.75rem',color:'#fbcfe8',fontStyle:'italic',textAlign:'center',marginTop:'0.5rem',marginBottom:0}}>Tap to flip back</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div style={{marginTop:'1rem'}}>
-          <button onClick={() => setShowResetConfirm(true)} style={{width:'100%',padding:'0.75rem',background:'#e5e7eb',border:'none',borderRadius:'0.5rem',fontWeight:'600',color:'#374151',cursor:'pointer',fontSize:'1rem'}}>Reset Tracker</button>
+          <p style={{fontSize:'0.875rem',color:'#6b7280',flex:1,textAlign:'center'}}>
+            Explore what <strong>{includeYou?'five':'six'}</strong> customers could earn you in the first 30 days
+          </p>
+          <div style={{width:'5rem'}}></div>
         </div>
       </div>
 
-      {showInfoPopup && <HowPaidPopup onClose={() => setShowInfoPopup(false)} />}
+      <div style={{background:'white',borderRadius:'1rem',boxShadow:'0 4px 16px rgba(0,0,0,0.08)',padding:'1.5rem'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1rem'}}>
+          {customers.map((customer,index)=>{
+            const col = circleColor(customer);
+            const cb = calculateCB(customer,index);
+            const showHAB = customer.type==='homeowner'&&(customer.services===3||customer.services===4)&&highActivityCustomers>=2;
+            return (
+              <div key={index} style={{display:'flex',flexDirection:'column',alignItems:'center',position:'relative'}}>
+                <div onClick={()=>handleCircleClick(index)} style={{width:'5rem',height:'5rem',borderRadius:'50%',border:`4px solid ${col.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:'1.125rem',fontWeight:'700',position:'relative',background:col.bg,color:col.text,cursor:canSelectCircle(index)?'pointer':'not-allowed',opacity:getCircleOpacity(index),transition:'transform 0.15s',boxSizing:'border-box'}}>
+                  {(index===0&&includeYou)?(
+                    <span style={{fontSize:'1rem',fontWeight:'700'}}>You</span>
+                  ):customer.type?(
+                    <>
+                      <span style={{fontSize:'0.875rem',fontWeight:'700'}}>£{cb.toLocaleString()}</span>
+                      {showHAB&&(<div style={{position:'absolute',top:'-0.25rem',right:'-0.25rem',padding:'0.125rem 0.25rem',background:'#f97316',color:'white',fontSize:'0.625rem',fontWeight:'700',borderRadius:'0.25rem',zIndex:10}}>+£{habPerCustomer}</div>)}
+                      <div onClick={(e)=>handlePartnerBadgeClick(e,index)} style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:`2px solid ${customer.isPartner?'#ca8a04':'#9ca3af'}`,display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,cursor:'pointer',background:customer.isPartner?'#facc15':'#e5e7eb',transition:'transform 0.15s'}}>
+                        <span style={{fontSize:'0.625rem',fontWeight:'700',color:customer.isPartner?'#713f12':'#6b7280'}}>P</span>
+                      </div>
+                    </>
+                  ):(
+                    <>
+                      <span style={{fontSize:'0.875rem'}}>{includeYou?ordinal(index):ordinal(index+1)}</span>
+                      <div style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:'2px solid #9ca3af',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,background:'#e5e7eb'}}>
+                        <span style={{fontSize:'0.625rem',fontWeight:'700',color:'#6b7280'}}>P</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-      {selectedCircle !== null && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'1rem'}} onClick={() => setSelectedCircle(null)}>
-          <div className="animate-slideDown" style={{background:'white',borderRadius:'0.75rem',padding:'1.5rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'24rem',width:'100%'}} onClick={e => e.stopPropagation()}>
+        {showPartnerPrompt&&allCirclesFilled&&!hasPartner&&(
+          <div style={{marginBottom:'1rem',padding:'1rem',background:'linear-gradient(to right,#facc15,#f59e0b)',borderRadius:'0.5rem',boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+              <span style={{fontSize:'0.875rem',fontWeight:'700',color:'#713f12'}}>Press above to upgrade one customer to Partner:</span>
+              <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                <div style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'#e5e7eb',border:'2px solid #9ca3af',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:'0.625rem',fontWeight:'700',color:'#6b7280'}}>P</span></div>
+                <span style={{fontSize:'1.25rem'}}>→</span>
+                <div style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'#facc15',border:'2px solid #ca8a04',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:'0.625rem',fontWeight:'700',color:'#713f12'}}>P</span></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{display:'flex',flexDirection:'column',gap:'0.75rem'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`4px solid ${totalCB>0?'#7c3aed':'#d1d5db'}`,background:totalCB>0?'#f5f3ff':'#f9fafb'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+              <span style={{fontSize:'1.25rem',filter:totalCB>0?'none':'grayscale(1)',opacity:totalCB>0?1:0.4}}>💷</span>
+              <span style={{fontWeight:'600',color:totalCB>0?'#7c3aed':'#4b5563'}}>Customer Bonus:</span>
+            </div>
+            <span style={{fontSize:'1.25rem',fontWeight:'700',color:totalCB>0?'#6d28d9':'#9ca3af'}}>£{totalCB.toLocaleString()}</span>
+          </div>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`4px solid ${highActivityCustomers>=2?'#f97316':'#e5e7eb'}`,background:highActivityCustomers>=2?'#fff7ed':'#f9fafb'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+              <span style={{fontSize:'1.25rem',filter:highActivityCustomers>=2?'none':'grayscale(1)',opacity:highActivityCustomers>=2?1:0.4}}>🔥</span>
+              <span style={{fontWeight:'600',color:highActivityCustomers>=2?'#ea580c':'#9ca3af'}}>High Activity Bonus:</span>
+            </div>
+            <span style={{fontSize:'1.25rem',fontWeight:'700',color:highActivityCustomers>=2?'#ea580c':'#9ca3af'}}>{highActivityCustomers>=2?`£${totalHAB.toLocaleString()}`:'—'}</span>
+          </div>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`2px solid ${qualifiesForFastStarter?'#86efac':'#e5e7eb'}`,background:qualifiesForFastStarter?'#f0fdf4':'#f9fafb'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+              <TrendingUp style={{...MD,color:qualifiesForFastStarter?'#16a34a':'#9ca3af'}}/>
+              <span style={{fontWeight:'600',color:qualifiesForFastStarter?'#16a34a':'#374151'}}>Fast Starter Bonus:</span>
+            </div>
+            <span style={{fontSize:'1.25rem',fontWeight:'700',color:qualifiesForFastStarter?'#16a34a':'#9ca3af'}}>{qualifiesForFastStarter?`£${fastStarterBonus.toLocaleString()}`:'—'}</span>
+          </div>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'1rem',borderRadius:'0.5rem',boxShadow:'0 2px 8px rgba(0,0,0,0.15)',color:'white',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',inset:0,background:grandTotal>0?'linear-gradient(to right,#7c3aed,#db2777)':'#9ca3af'}}></div>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem',position:'relative',zIndex:1}}>
+              <span style={{fontWeight:'700',fontSize:'1.125rem'}}>TOTAL EARNINGS:</span>
+              <button onClick={(e)=>{ e.stopPropagation(); setShowInfoPopup(true); }} style={{width:'1.5rem',height:'1.5rem',borderRadius:'50%',background:'rgba(255,255,255,0.3)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+                <Info style={{...XS,color:'white'}}/>
+              </button>
+            </div>
+            <span style={{fontSize:'1.5rem',fontWeight:'700',position:'relative',zIndex:1}}>£{grandTotal.toLocaleString()}</span>
+          </div>
+
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',border:`4px solid ${tenantCount>0?'#2563eb':'#e5e7eb'}`,background:tenantCount>0?'#eff6ff':'#f9fafb'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+              <RefreshCw style={{...MD,color:tenantCount>0?'#2563eb':'#9ca3af'}}/>
+              <span style={{fontWeight:'600',color:tenantCount>0?'#374151':'#9ca3af'}}>Recurring Income:</span>
+            </div>
+            {tenantCount>0?(
+              <div style={{textAlign:'right'}}>
+                <span style={{fontSize:'1.25rem',fontWeight:'700',color:'#2563eb'}}>£{residualIncome.toFixed(2)}/m</span>
+                <span style={{display:'block',fontSize:'0.75rem',color:'#3b82f6'}}>(£{(residualIncome*12).toLocaleString()}/yr)</span>
+              </div>
+            ):(
+              <span style={{fontSize:'1.25rem',fontWeight:'700',color:'#9ca3af'}}>—</span>
+            )}
+          </div>
+
+          <div onClick={()=>qualifiesForFastStarter&&setCardFlipped(!cardFlipped)} style={{borderRadius:'0.75rem',border:`2px solid ${qualifiesForFastStarter?'#a78bfa':'#e5e7eb'}`,overflow:'hidden',cursor:qualifiesForFastStarter?'pointer':'not-allowed'}}>
+            {!cardFlipped?(
+              <div style={{padding:'1rem',background:qualifiesForFastStarter?'linear-gradient(to right,#7c3aed,#db2777)':'#f3f4f6'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.75rem'}}>
+                  {qualifiesForFastStarter?<span style={{fontSize:'1.125rem',lineHeight:1}}>🔓</span>:<Lock style={{...SM,color:'#9ca3af'}}/>}
+                  <span style={{fontWeight:'700',fontSize:'1rem',color:qualifiesForFastStarter?'white':'#9ca3af'}}>New Revenue Streams Unlocked</span>
+                </div>
+                <div style={{fontSize:'0.875rem',color:bannerCol,display:'flex',flexDirection:'column',gap:'0.25rem'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}><span style={{filter:qualifiesForFastStarter?'none':'grayscale(1)',opacity:qualifiesForFastStarter?1:0.5}}>🤝</span><span>Supporting Customer</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}><span style={{filter:qualifiesForFastStarter?'none':'grayscale(1)',opacity:qualifiesForFastStarter?1:0.5}}>🎓</span><span>Mentor</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}><TrendingUp style={{...SM,color:bannerCol}}/><span>{'  '}Fast Starter Mentor</span></div>
+                </div>
+                {qualifiesForFastStarter&&<p style={{fontSize:'0.75rem',color:'#fbcfe8',fontStyle:'italic',textAlign:'center',marginTop:'0.75rem',marginBottom:0}}>Tap to see worked example</p>}
+              </div>
+            ):(
+              <div style={{padding:'1rem',background:'linear-gradient(to right,#7c3aed,#db2777)'}}>
+                <p style={{color:'white',fontWeight:'700',fontSize:'0.875rem',marginBottom:'0.25rem',marginTop:0}}>🔓 New Revenue Streams Unlocked — Worked Example</p>
+                <p style={{color:'#fbcfe8',fontSize:'0.75rem',marginBottom:'0.75rem'}}>For each Partner you recruit and support to their QD* Fast Starter Bonus:</p>
+                <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'0.5rem',padding:'0.75rem',marginBottom:'0.75rem'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',color:'white',fontSize:'0.875rem',marginBottom:'0.25rem'}}>
+                    <span>They earn (just like you, above)</span>
+                    <span style={{fontWeight:'700'}}>£{grandTotal.toLocaleString()}</span>
+                  </div>
+                  <div style={{borderTop:'1px solid rgba(255,255,255,0.3)',paddingTop:'0.25rem',display:'flex',justifyContent:'space-between',fontSize:'0.875rem'}}>
+                    <span style={{color:'#fbcfe8'}}>You earn (in this example)</span>
+                    <span style={{fontWeight:'700',color:'#fde68a'}}>£{partnerTotalEarnings.toLocaleString()}</span>
+                  </div>
+                </div>
+                <p style={{color:'white',fontSize:'0.75rem',fontWeight:'600',marginBottom:'0.25rem'}}>Made up of:</p>
+                {[
+                  {icon:'🤝',label:'Supporting Customer Bonuses',val:supportingBonus},
+                  {icon:'🎓',label:'Mentor Bonus',val:100},
+                  {icon:null,label:'Fast Starter Mentor Bonus',val:300},
+                ].map(r=>(
+                  <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'0.875rem',background:'rgba(255,255,255,0.1)',borderRadius:'0.25rem',padding:'0.25rem 0.5rem',marginBottom:'0.25rem'}}>
+                    <span style={{display:'flex',alignItems:'center',color:'#fbcfe8'}}>
+                      {r.icon?<span style={{marginRight:'0.375rem'}}>{r.icon}</span>:<span style={{display:'inline-flex',alignItems:'center',marginRight:'0.375rem'}}><TrendingUp style={{...XS,color:'#fbcfe8'}}/></span>}
+                      {'  '}{r.label}
+                    </span>
+                    <span style={{color:'white',fontWeight:'700'}}>£{r.val.toLocaleString()}</span>
+                  </div>
+                ))}
+                <p style={{fontSize:'0.75rem',color:'#fbcfe8',fontStyle:'italic',textAlign:'center',marginTop:'0.5rem',marginBottom:0}}>Tap to flip back</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{marginTop:'1rem'}}>
+        <button onClick={()=>setShowResetConfirm(true)} style={{width:'100%',padding:'0.75rem',background:'#e5e7eb',border:'none',borderRadius:'0.5rem',fontWeight:'600',color:'#374151',cursor:'pointer',fontSize:'1rem'}}>Reset Tracker</button>
+      </div>
+
+      {selectedCircle!==null&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'1rem'}} onClick={()=>setSelectedCircle(null)}>
+          <div className="animate-slideDown" style={{background:'white',borderRadius:'0.75rem',padding:'1.5rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'24rem',width:'100%'}} onClick={e=>e.stopPropagation()}>
             <p style={{fontSize:'0.875rem',fontWeight:'600',color:'#111827',marginBottom:'1rem',textAlign:'center'}}>
-              {includeYou ? `Customer ${selectedCircle}` : `Customer ${selectedCircle+1}`}: Homeowner with how many services?
+              {includeYou?`Customer ${selectedCircle}`:`Customer ${selectedCircle+1}`}: Homeowner with how many services?
             </p>
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'0.5rem',marginBottom:'0.75rem'}}>
-              {[1,2,3,4].map(num => {
-                const cb = [50,100,250,300][num-1];
-                const active = customers[selectedCircle] && customers[selectedCircle].type === 'homeowner' && customers[selectedCircle].services === num;
+              {[1,2,3,4].map(num=>{
+                const cb=[50,100,250,300][num-1];
+                const active=customers[selectedCircle]&&customers[selectedCircle].type==='homeowner'&&customers[selectedCircle].services===num;
                 return (
-                  <button key={num} onClick={() => setCustomerType('homeowner', num)} style={{padding:'1rem 0.5rem',border:`2px solid ${active?'#7c3aed':'#c4b5fd'}`,borderRadius:'0.5rem',background:active?'#7c3aed':'#f5f3ff',color:active?'white':'#6d28d9',cursor:'pointer',fontWeight:'600'}}>
+                  <button key={num} onClick={()=>setCustomerType('homeowner',num)} style={{padding:'1rem 0.5rem',border:`2px solid ${active?'#7c3aed':'#c4b5fd'}`,borderRadius:'0.5rem',background:active?'#7c3aed':'#f5f3ff',color:active?'white':'#6d28d9',cursor:'pointer',fontWeight:'600'}}>
                     <div style={{fontSize:'1rem',fontWeight:'700'}}>{num}</div>
                     <div style={{fontSize:'0.75rem',marginTop:'0.25rem'}}>(£{cb})</div>
                   </button>
@@ -683,31 +622,31 @@ const UWTracker = () => {
               })}
             </div>
             <p style={{textAlign:'center',fontSize:'0.875rem',color:'#6b7280',marginBottom:'0.75rem'}}>or</p>
-            <button onClick={() => setCustomerType('renting')} style={{width:'100%',padding:'0.75rem',border:`2px solid ${customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'#2563eb':'#93c5fd'}`,borderRadius:'0.5rem',background:customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'#2563eb':'#eff6ff',color:customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'white':'#1d4ed8',cursor:'pointer',fontWeight:'600',marginBottom:'0.75rem'}}>
+            <button onClick={()=>setCustomerType('renting')} style={{width:'100%',padding:'0.75rem',border:`2px solid ${customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'#2563eb':'#93c5fd'}`,borderRadius:'0.5rem',background:customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'#2563eb':'#eff6ff',color:customers[selectedCircle]&&customers[selectedCircle].type==='renting'?'white':'#1d4ed8',cursor:'pointer',fontWeight:'600',marginBottom:'0.75rem'}}>
               <div style={{fontSize:'1rem',fontWeight:'700'}}>Tenant/Renting</div>
               <div style={{fontSize:'0.75rem',fontWeight:'400'}}>(No customer bonus, just recurring income)</div>
             </button>
-            {customers[selectedCircle] && customers[selectedCircle].type !== null && (
+            {customers[selectedCircle]&&customers[selectedCircle].type!==null&&(
               <button onClick={removeCustomer} style={{width:'100%',padding:'0.75rem',border:'2px solid #fca5a5',borderRadius:'0.5rem',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontWeight:'600'}}>Remove Customer</button>
             )}
           </div>
         </div>
       )}
 
-      {showResetConfirm && (
+      {showResetConfirm&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'1rem'}}>
           <div className="animate-slideDown" style={{background:'white',borderRadius:'0.75rem',padding:'1.5rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'24rem',width:'100%'}}>
             <p style={{fontSize:'1.125rem',fontWeight:'600',color:'#111827',marginBottom:'1rem',textAlign:'center'}}>Are you sure?</p>
             <p style={{fontSize:'0.875rem',color:'#6b7280',marginBottom:'1.5rem',textAlign:'center'}}>This will reset all customer data and cannot be undone.</p>
             <div style={{display:'flex',gap:'0.75rem'}}>
-              <button onClick={() => setShowResetConfirm(false)} style={{flex:1,padding:'0.5rem',background:'#e5e7eb',border:'none',borderRadius:'0.5rem',fontWeight:'600',color:'#374151',cursor:'pointer'}}>No</button>
+              <button onClick={()=>setShowResetConfirm(false)} style={{flex:1,padding:'0.5rem',background:'#e5e7eb',border:'none',borderRadius:'0.5rem',fontWeight:'600',color:'#374151',cursor:'pointer'}}>No</button>
               <button onClick={resetTracking} style={{flex:1,padding:'0.5rem',background:'#ef4444',border:'none',borderRadius:'0.5rem',fontWeight:'600',color:'white',cursor:'pointer'}}>Yes, Reset</button>
             </div>
           </div>
         </div>
       )}
 
-      {showCelebration && (
+      {showCelebration&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:40,padding:'1rem'}}>
           <div className="animate-bounceOnce" style={{background:'white',borderRadius:'1rem',padding:'2rem',maxWidth:'28rem',textAlign:'center'}}>
             <div style={{fontSize:'3.75rem',marginBottom:'1rem'}}>🎉</div>
@@ -716,6 +655,574 @@ const UWTracker = () => {
             <p style={{fontSize:'2.25rem',fontWeight:'700',color:'#16a34a',marginBottom:'1rem'}}>£500 Fast Starter Bonus!</p>
           </div>
         </div>
+      )}
+    </>
+  );
+};
+
+// ── TRACK MODE — customer grid ─────────────────────────────────────────────
+const TrackGrid = ({ customers, setCustomers, label, includeYou, isMonth1, gatheredBefore }) => {
+  // gatheredBefore = count of gathered (non-You) filled customers in the OTHER month
+  const [selectedCircle, setSelectedCircle] = useState(null);
+  const [pendingCustomer, setPendingCustomer] = useState(null); // { type, services } awaiting supported question
+  const longPressTimer = useRef(null);
+
+  const MIN_ROWS = 2;
+  const canRemoveRow = customers.length > MIN_ROWS * 3;
+
+  const addRow = () => setCustomers(prev => [...prev, emptyCustomer(), emptyCustomer(), emptyCustomer()]);
+  const removeLastRow = () => { if (canRemoveRow) setCustomers(prev => prev.slice(0, prev.length - 3)); };
+
+  const handleAddPress = () => {
+    longPressTimer.current = setTimeout(() => { longPressTimer.current = null; removeLastRow(); }, 600);
+  };
+  const handleAddRelease = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; addRow(); }
+  };
+
+  const handleCircleClick = (index) => {
+    if (index === 0 && includeYou && isMonth1) return;
+    setSelectedCircle(index);
+  };
+
+  const togglePartner = (e, index) => {
+    e.stopPropagation();
+    if (index === 0 && includeYou && isMonth1) return;
+    if (!customers[index].type) return;
+    setCustomers(prev => { const nc=[...prev]; nc[index]={...nc[index],isPartner:!nc[index].isPartner}; return nc; });
+  };
+
+  // Count gathered customers in THIS grid so far (excluding You slot and empty)
+  const gatheredInThisGrid = (upToIndex) => {
+    let count = 0;
+    for (let i = 0; i < customers.length; i++) {
+      if (i === upToIndex) break;
+      const isYou = i === 0 && includeYou && isMonth1;
+      if (!isYou && customers[i].type !== null) count++;
+    }
+    return count;
+  };
+
+  const isGatheredSlot = (index) => !(index === 0 && includeYou && isMonth1);
+
+  // Global gathered count up to (but not including) this slot
+  const globalGatheredBefore = (index) => gatheredBefore + gatheredInThisGrid(index);
+
+  const commitCustomer = (type, services, supported) => {
+    setCustomers(prev => {
+      const nc = [...prev];
+      nc[selectedCircle] = { type, services: services||0, isPartner: nc[selectedCircle].isPartner, supported: !!supported };
+      return nc;
+    });
+    setSelectedCircle(null);
+    setPendingCustomer(null);
+  };
+
+  const setCustomerType = (type, services) => {
+    if (selectedCircle === null) return;
+    const isYou = selectedCircle === 0 && includeYou && isMonth1;
+    const globalCount = globalGatheredBefore(selectedCircle);
+    // Ask "supported?" only for gathered slots that are the 7th+ customer overall
+    if (!isYou && globalCount >= 6 && type !== null) {
+      setPendingCustomer({ type, services: services||0 });
+      // Keep selectedCircle open but switch to supported question
+    } else {
+      commitCustomer(type, services, false);
+    }
+  };
+
+  const removeCustomer = () => {
+    if (selectedCircle === null) return;
+    setCustomers(prev => { const nc=[...prev]; nc[selectedCircle]=emptyCustomer(); return nc; });
+    setSelectedCircle(null);
+  };
+
+  const circleColor = (c, index) => {
+    if (index === 0 && includeYou && isMonth1) return { border:'#9ca3af', text:'#374151', bg:'#f3f4f6' };
+    if (!c.type) return { border:'#d1d5db', text:'#9ca3af', bg:'#f9fafb' };
+    if (c.supported) {
+      // Muted/washed out for supported customers
+      if (c.type==='renting') return { border:'#93c5fd', text:'#6b9fd4', bg:'#f0f7ff' };
+      return { border:'#c4b5fd', text:'#a78bfa', bg:'#faf8ff' };
+    }
+    if (c.type==='renting') return { border:'#2563eb', text:'#1d4ed8', bg:'#eff6ff' };
+    return { border:'#7c3aed', text:'#6d28d9', bg:'#f5f3ff' };
+  };
+
+  const ordinal = (n) => n===1?'1st':n===2?'2nd':n===3?'3rd':`${n}th`;
+  const slotLabel = (index) => {
+    if (index === 0 && includeYou && isMonth1) return 'You';
+    const num = (includeYou && isMonth1) ? index : index + 1;
+    return ordinal(num);
+  };
+
+  return (
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'1rem',marginBottom:'1rem'}}>
+        {customers.map((customer, index) => {
+          const col = circleColor(customer, index);
+          const isYouSlot = index === 0 && includeYou && isMonth1;
+          const rawCB = isYouSlot ? 0 : calcCB(customer.type, customer.services);
+          const cb = customer.supported ? rawCB / 2 : rawCB;
+          return (
+            <div key={index} style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+              <div onClick={() => handleCircleClick(index)}
+                style={{width:'5rem',height:'5rem',borderRadius:'50%',border:`4px solid ${col.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',background:col.bg,color:col.text,cursor:isYouSlot?'default':'pointer',transition:'transform 0.1s',boxSizing:'border-box',opacity:customer.supported?0.75:1}}>
+                {isYouSlot ? (
+                  <span style={{fontSize:'1rem',fontWeight:'700'}}>You</span>
+                ) : customer.type ? (
+                  <>
+                    <span style={{fontSize:'0.875rem',fontWeight:'700'}}>£{cb.toLocaleString()}</span>
+                    {customer.supported && <span style={{fontSize:'0.55rem',color:col.text,opacity:0.8,lineHeight:1}}>½ split</span>}
+                    {customer.type==='homeowner'&&(customer.services===3||customer.services===4)&&(
+                      <div style={{position:'absolute',top:'-0.25rem',right:'-0.25rem',padding:'0.125rem 0.3rem',background:'#f97316',color:'white',fontSize:'0.6rem',fontWeight:'700',borderRadius:'0.25rem',zIndex:10,whiteSpace:'nowrap'}}>
+                        +£{customer.services===3?50:100}
+                      </div>
+                    )}
+                    <div onClick={(e)=>togglePartner(e,index)} style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:`2px solid ${customer.isPartner?'#ca8a04':'#9ca3af'}`,display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,cursor:'pointer',background:customer.isPartner?'#facc15':'#e5e7eb',transition:'transform 0.15s'}}>
+                      <span style={{fontSize:'0.625rem',fontWeight:'700',color:customer.isPartner?'#713f12':'#6b7280'}}>P</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span style={{fontSize:'0.8rem',color:'#9ca3af'}}>{slotLabel(index)}</span>
+                    <div style={{position:'absolute',bottom:'-0.25rem',right:'-0.25rem',width:'1.5rem',height:'1.5rem',borderRadius:'50%',border:'2px solid #9ca3af',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,background:'#e5e7eb'}}>
+                      <span style={{fontSize:'0.625rem',fontWeight:'700',color:'#6b7280'}}>P</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onMouseDown={handleAddPress} onMouseUp={handleAddRelease}
+        onMouseLeave={()=>{ if(longPressTimer.current){clearTimeout(longPressTimer.current);longPressTimer.current=null;} }}
+        onTouchStart={handleAddPress} onTouchEnd={handleAddRelease}
+        style={{width:'100%',padding:'0.5rem',background:'#f5f3ff',border:'2px dashed #c4b5fd',borderRadius:'0.5rem',color:'#7c3aed',fontWeight:'600',cursor:'pointer',fontSize:'0.875rem',marginBottom:'0.25rem',userSelect:'none',WebkitUserSelect:'none'}}
+      >+ Add row</button>
+      {canRemoveRow && <p style={{fontSize:'0.65rem',color:'#c4b5fd',textAlign:'center',margin:'0 0 0.5rem',fontStyle:'italic'}}>Hold to remove last row</p>}
+
+      {/* ── Customer type selection popup ── */}
+      {selectedCircle !== null && !pendingCustomer && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:'1rem'}} onClick={()=>setSelectedCircle(null)}>
+          <div className="animate-slideDown" style={{background:'white',borderRadius:'0.75rem',padding:'1.5rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'24rem',width:'100%'}} onClick={e=>e.stopPropagation()}>
+            <p style={{fontSize:'0.875rem',fontWeight:'600',color:'#111827',marginBottom:'1rem',textAlign:'center'}}>
+              {slotLabel(selectedCircle)}: what type of customer?
+            </p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'0.5rem',marginBottom:'0.75rem'}}>
+              {[1,2,3,4].map(num=>{
+                const cbAmt=[50,100,250,300][num-1];
+                const active = customers[selectedCircle]?.type==='homeowner' && customers[selectedCircle]?.services===num;
+                return (
+                  <button key={num} onClick={()=>setCustomerType('homeowner',num)} style={{padding:'1rem 0.5rem',border:`2px solid ${active?'#7c3aed':'#c4b5fd'}`,borderRadius:'0.5rem',background:active?'#7c3aed':'#f5f3ff',color:active?'white':'#6d28d9',cursor:'pointer',fontWeight:'600'}}>
+                    <div style={{fontSize:'1rem',fontWeight:'700'}}>{num}</div>
+                    <div style={{fontSize:'0.75rem',marginTop:'0.25rem'}}>(£{cbAmt})</div>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{textAlign:'center',fontSize:'0.75rem',color:'#9ca3af',marginBottom:'0.75rem'}}>Homeowner — services 1–4</p>
+            <button onClick={()=>setCustomerType('renting')} style={{width:'100%',padding:'0.75rem',border:`2px solid ${customers[selectedCircle]?.type==='renting'?'#2563eb':'#93c5fd'}`,borderRadius:'0.5rem',background:customers[selectedCircle]?.type==='renting'?'#2563eb':'#eff6ff',color:customers[selectedCircle]?.type==='renting'?'white':'#1d4ed8',cursor:'pointer',fontWeight:'600',marginBottom:'0.75rem'}}>
+              <div style={{fontSize:'1rem',fontWeight:'700'}}>Tenant / Renting</div>
+              <div style={{fontSize:'0.75rem',fontWeight:'400'}}>(No customer bonus, just recurring income)</div>
+            </button>
+            {customers[selectedCircle]?.type && (
+              <button onClick={removeCustomer} style={{width:'100%',padding:'0.75rem',border:'2px solid #fca5a5',borderRadius:'0.5rem',background:'#fef2f2',color:'#b91c1c',cursor:'pointer',fontWeight:'600'}}>Remove Customer</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Supported? follow-up popup (7th+ gathered customer) ── */}
+      {selectedCircle !== null && pendingCustomer && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:51,padding:'1rem'}}>
+          <div className="animate-slideDown" style={{background:'white',borderRadius:'0.75rem',padding:'1.5rem',boxShadow:'0 20px 50px rgba(0,0,0,0.3)',maxWidth:'24rem',width:'100%'}}>
+            <div style={{textAlign:'center',marginBottom:'1rem'}}>
+              <div style={{fontSize:'1.5rem',marginBottom:'0.5rem'}}>🤝</div>
+              <p style={{fontSize:'0.9rem',fontWeight:'700',color:'#111827',margin:'0 0 0.35rem'}}>Was this customer supported?</p>
+              <p style={{fontSize:'0.75rem',color:'#6b7280',margin:0}}>
+                This is your {ordinal(globalGatheredBefore(selectedCircle)+1)} gathered customer.<br/>
+                If supported, your CB is split 50/50 with your supporting partner.
+              </p>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0.75rem'}}>
+              <button onClick={()=>commitCustomer(pendingCustomer.type,pendingCustomer.services,true)}
+                style={{padding:'0.875rem',border:'2px solid #f97316',borderRadius:'0.5rem',background:'#fff7ed',color:'#ea580c',cursor:'pointer',fontWeight:'700',fontSize:'0.875rem'}}>
+                <div>Yes, supported</div>
+                <div style={{fontSize:'0.7rem',fontWeight:'400',marginTop:'0.2rem',color:'#9a3412'}}>50% CB to you</div>
+              </button>
+              <button onClick={()=>commitCustomer(pendingCustomer.type,pendingCustomer.services,false)}
+                style={{padding:'0.875rem',border:'2px solid #7c3aed',borderRadius:'0.5rem',background:'#f5f3ff',color:'#6d28d9',cursor:'pointer',fontWeight:'700',fontSize:'0.875rem'}}>
+                <div>No, unsupported</div>
+                <div style={{fontSize:'0.7rem',fontWeight:'400',marginTop:'0.2rem',color:'#4c1d95'}}>Full CB to you</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+// ── TRACK MODE — per-month earnings breakdown ──────────────────────────────
+const MonthBreakdown = ({ cb, hab, fsbQualifies, total, m1Residual, m2Residual, isMonth2, m1MonthName }) => {
+  const hasM1 = m1Residual > 0;
+  const hasM2 = m2Residual > 0;
+  const showResidual = isMonth2 ? (hasM1 || hasM2) : hasM1;
+  const residualTotal = isMonth2 ? m1Residual + m2Residual : m1Residual;
+  // Compact carry-over label: "(includes £x.xx from February)"
+  const residualSub = (isMonth2 && hasM1)
+    ? `(includes £${m1Residual.toFixed(2)} from ${m1MonthName})`
+    : '';
+
+  const row = (icon, label, value, active, color, sub) => (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.5rem 0.75rem',borderRadius:'0.5rem',border:`2px solid ${active ? color.border : '#e5e7eb'}`,background:active ? color.bg : '#f9fafb',marginBottom:'0.4rem'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flex:1,minWidth:0}}>
+        <span style={{fontSize:'1rem',filter:active?'none':'grayscale(1)',opacity:active?1:0.35,flexShrink:0}}>{icon}</span>
+        <div style={{minWidth:0}}>
+          <span style={{fontWeight:'600',fontSize:'0.8rem',color:active?color.text:'#9ca3af'}}>{label}</span>
+        </div>
+        {sub && <span style={{fontSize:'0.65rem',color:'#6b7280',fontStyle:'italic',marginLeft:'0.35rem',flexShrink:0}}>{sub}</span>}
+      </div>
+      <span style={{fontWeight:'700',fontSize:'0.875rem',color:active?color.text:'#d1d5db',flexShrink:0,marginLeft:'0.5rem'}}>
+        {active ? (value === Math.floor(value) ? `£${value.toLocaleString()}` : `£${value.toFixed(2)}`) : '—'}
+      </span>
+    </div>
+  );
+
+  return (
+    <div style={{marginBottom:'0.75rem'}}>
+      {row('💷', 'Customer Bonus',       cb,  cb>0,          {border:'#c4b5fd',bg:'#f5f3ff',text:'#6d28d9'})}
+      {row('🔥', 'High Activity Bonus',  hab, hab>0,         {border:'#fed7aa',bg:'#fff7ed',text:'#ea580c'})}
+      {row('🚀', 'Fast Starter Bonus',   500, fsbQualifies,  {border:'#86efac',bg:'#f0fdf4',text:'#16a34a'})}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0.75rem 1rem',borderRadius:'0.5rem',position:'relative',overflow:'hidden',marginBottom:'0.4rem'}}>
+        <div style={{position:'absolute',inset:0,background:total>0?'linear-gradient(to right,#7c3aed,#db2777)':'#d1d5db'}}></div>
+        <span style={{fontWeight:'700',fontSize:'0.9rem',position:'relative',zIndex:1,color:'white'}}>Total Earnings</span>
+        <span style={{fontSize:'1.25rem',fontWeight:'700',position:'relative',zIndex:1,color:'white'}}>£{total.toLocaleString()}</span>
+      </div>
+      {showResidual
+        ? row('🔄', 'Recurring Income', residualTotal, true, {border:'#93c5fd',bg:'#eff6ff',text:'#2563eb'}, residualSub)
+        : row('🔄', 'Recurring Income', 0, false, {border:'#93c5fd',bg:'#eff6ff',text:'#2563eb'})
+      }
+    </div>
+  );
+};
+
+// ── TRACK MODE — swipeable month tabs ──────────────────────────────────────
+const SwipeTabs = ({ activeTab, onSwipe, tab1Label, tab2Label }) => {
+  const touchStartX = useRef(null);
+  const [hintDone, setHintDone] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setHintDone(true), 4500);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd   = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) onSwipe(dx < 0 ? 1 : 0);
+    touchStartX.current = null;
+  };
+
+  return (
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+      style={{display:'flex',gap:'0.5rem',marginBottom:'0.75rem'}}>
+      {[tab1Label, tab2Label].map((label, i) => (
+        <button key={i} onClick={() => onSwipe(i)}
+          style={{flex:1,padding:'0.6rem 0.5rem',border:`2px solid ${activeTab===i?'#7c3aed':'#e5e7eb'}`,borderRadius:'0.75rem',background:activeTab===i?'#7c3aed':'white',color:activeTab===i?'white':'#374151',cursor:'pointer',fontWeight:'600',fontSize:'0.875rem',transition:'all 0.15s',textAlign:'center',position:'relative'}}>
+          {label}
+          {i === 0 && activeTab === 0 && !hintDone && (
+            <span className="swipe-hint" style={{position:'absolute',right:'0.5rem',top:'50%',transform:'translateY(-50%)',fontSize:'0.75rem',color:'rgba(255,255,255,0.7)',pointerEvents:'none'}}>›</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// ── TRACK MODE — main ──────────────────────────────────────────────────────
+const TrackMode = ({ trackState, setTrackState, onFSBCelebration }) => {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const [slideDir, setSlideDir] = useState(null);
+
+  const { startDateStr, includeYou, m1Customers, m2Customers, activeTab } = trackState;
+  const set = (patch) => setTrackState(prev => ({ ...prev, ...patch }));
+
+  const setM1Customers = (fn) => set({ m1Customers: typeof fn === 'function' ? fn(trackState.m1Customers) : fn });
+  const setM2Customers = (fn) => set({ m2Customers: typeof fn === 'function' ? fn(trackState.m2Customers) : fn });
+
+  const switchTab = (i) => {
+    if (i === activeTab) return;
+    setSlideDir(i > activeTab ? 'left' : 'right');
+    set({ activeTab: i });
+  };
+
+  const toggleIncludeYou = () => {
+    const niy = !includeYou;
+    const newM1 = [...m1Customers];
+    newM1[0] = niy ? { type:'own', services:0, isPartner:false } : emptyCustomer();
+    set({ includeYou: niy, m1Customers: newM1 });
+  };
+
+  const startDate   = startDateStr ? parseLocalDate(startDateStr) : null;
+  const fsbEndDate  = startDate ? addDays(startDate, 29) : null;
+  const m2StartDate = startDate ? startOfMonth(addDays(startDate, 32)) : null;
+  const daysLeft    = startDate ? Math.max(0, 30 - (Math.floor((today - startDate) / 86400000) + 1)) : null;
+  const journeyComplete = daysLeft === 0;
+
+  const allFilledCount = m1Customers.filter(c=>c.type!==null).length + m2Customers.filter(c=>c.type!==null).length;
+  const hasPartner     = [...m1Customers, ...m2Customers].some(c => c.isPartner);
+  const fsbQualifies   = allFilledCount >= 6 && hasPartner;
+  const fsbNeeded      = Math.max(0, 6 - allFilledCount);
+
+  // Only fire celebration when genuinely adding customers in Track — guard with appMode check done at root
+  const prevFSB = useRef(false);
+  useEffect(() => {
+    if (fsbQualifies && !prevFSB.current) onFSBCelebration();
+    prevFSB.current = fsbQualifies;
+  }, [fsbQualifies]);
+
+  const m1HABCount = m1Customers.filter(c=>c.type==='homeowner'&&(c.services===3||c.services===4)).length;
+  const m1HAB      = m1HABCount * calcHAB(m1HABCount);
+  const m2HABCount = m2Customers.filter(c=>c.type==='homeowner'&&(c.services===3||c.services===4)).length;
+  const m2HAB      = m2HABCount * calcHAB(m2HABCount);
+
+  // CB respects supported flag (50% split)
+  const calcCBForCustomer = (c) => {
+    const raw = calcCB(c.type==='own'?null:c.type, c.services);
+    return c.supported ? raw / 2 : raw;
+  };
+  const m1CB = m1Customers.reduce((s,c) => s + calcCBForCustomer(c), 0);
+  const m2CB = m2Customers.reduce((s,c) => s + calcCBForCustomer(c), 0);
+
+  // Gathered count: non-You, filled customers
+  const m1GatheredCount = m1Customers.filter((c,i) => !(i===0&&includeYou) && c.type!==null).length;
+  const m2GatheredCount = m2Customers.filter(c => c.type!==null).length;
+
+  const m1Residual    = m1Customers.filter(c=>c.type==='renting').length * 2.5;
+  const m2Residual    = m2Customers.filter(c=>c.type==='renting').length * 2.5;
+  const totalResidual = m1Residual + m2Residual;
+
+  const m1Total       = m1CB + m1HAB;
+  const m2Total       = m2CB + m2HAB;
+  const combinedTotal = m1Total + m2Total + (fsbQualifies ? 500 : 0);
+
+  const m2Label     = m2StartDate ? m2StartDate.toLocaleDateString('en-GB',{month:'long'}) : 'Month 2';
+  const m1MonthName = startDate   ? startDate.toLocaleDateString('en-GB',{month:'long'})   : 'Month 1';
+
+  const fsbStatusText = () => {
+    if (fsbQualifies)  return '✅ Qualified!';
+    if (fsbNeeded > 0) return `${fsbNeeded} more customer${fsbNeeded>1?'s':''} needed`;
+    if (!hasPartner)   return 'Tap P on any customer to mark as Partner';
+    return '';
+  };
+
+  const tabAnimClass = slideDir === 'left' ? 'animate-slideInRight' : slideDir === 'right' ? 'animate-slideInLeft' : 'animate-fadeIn';
+
+  return (
+    <div className="animate-fadeIn">
+
+      {/* ── You + date + FSB end — single compact card ── */}
+      <div style={{background:'white',borderRadius:'1rem',boxShadow:'0 4px 16px rgba(0,0,0,0.08)',padding:'0.75rem 1rem',marginBottom:'0.875rem'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'0.75rem'}}>
+          {/* You toggle */}
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flexShrink:0}}>
+            <button onClick={toggleIncludeYou} style={{position:'relative',display:'inline-flex',height:'1.5rem',width:'2.75rem',alignItems:'center',borderRadius:'9999px',border:'none',cursor:'pointer',background:includeYou?'#22c55e':'#d1d5db',transition:'background 0.2s',flexShrink:0}}>
+              <span style={{display:'inline-block',height:'1rem',width:'1rem',transform:includeYou?'translateX(1.5rem)':'translateX(0.25rem)',borderRadius:'50%',background:'white',transition:'transform 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}></span>
+            </button>
+            <span style={{fontSize:'0.8rem',fontWeight:'600',color:'#374151'}}>You</span>
+          </div>
+          {/* Compact date picker — label + input inline */}
+          <div style={{display:'flex',alignItems:'center',gap:'0.4rem',flex:1}}>
+            <label style={{fontSize:'0.7rem',fontWeight:'600',color:'#7c3aed',whiteSpace:'nowrap'}}>Start</label>
+            <input type="date" value={startDateStr} max={todayStr} onChange={e=>set({startDateStr:e.target.value})}
+              style={{flex:1,minWidth:0,padding:'0.3rem 0.4rem',border:'2px solid #c4b5fd',borderRadius:'0.5rem',fontSize:'0.8rem',color:'#374151',outline:'none'}}/>
+          </div>
+          {/* FSB end date — only when date set */}
+          {startDate && (
+            <div style={{flexShrink:0,textAlign:'right'}}>
+              <div style={{fontSize:'0.55rem',color:'#7c3aed',fontWeight:'600',marginBottom:'0.1rem'}}>FSB BONUS ENDS</div>
+              <div style={{fontSize:'0.75rem',fontWeight:'700',color:'#374151'}}>{formatDate(fsbEndDate)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Swipeable month tabs ── */}
+      <SwipeTabs activeTab={activeTab} onSwipe={switchTab} tab1Label={m1MonthName} tab2Label={m2Label}/>
+
+      {/* ── Tab content ── */}
+      <div key={activeTab} className={tabAnimClass}>
+        {activeTab === 0 && (
+          <>
+            <div style={{background:'white',borderRadius:'1rem',boxShadow:'0 4px 16px rgba(0,0,0,0.08)',padding:'1.25rem',marginBottom:'0.75rem'}}>
+            <TrackGrid customers={m1Customers} setCustomers={setM1Customers} label={m1MonthName} includeYou={includeYou} isMonth1={true} gatheredBefore={0}/>
+            </div>
+            <MonthBreakdown cb={m1CB} hab={m1HAB} fsbQualifies={fsbQualifies} total={m1Total} m1Residual={m1Residual} m2Residual={0} isMonth2={false} m1MonthName={m1MonthName}/>
+          </>
+        )}
+        {activeTab === 1 && (
+          <>
+            <div style={{background:'white',borderRadius:'1rem',boxShadow:'0 4px 16px rgba(0,0,0,0.08)',padding:'1.25rem',marginBottom:'0.75rem'}}>
+            <TrackGrid customers={m2Customers} setCustomers={setM2Customers} label={m2Label} includeYou={false} isMonth1={false} gatheredBefore={m1GatheredCount}/>
+            </div>
+            <MonthBreakdown cb={m2CB} hab={m2HAB} fsbQualifies={fsbQualifies} total={m2Total} m1Residual={m1Residual} m2Residual={m2Residual} isMonth2={true} m1MonthName={m1MonthName}/>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── ROOT ───────────────────────────────────────────────────────────────────
+const initM1 = () => [
+  { type:'own', services:0, isPartner:false },
+  emptyCustomer(), emptyCustomer(),
+  emptyCustomer(), emptyCustomer(), emptyCustomer()
+];
+
+const UWTracker = () => {
+  const [appMode, setAppMode] = useState('show');
+  const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [showFSBCelebration, setShowFSBCelebration] = useState(false);
+  const fsbAlreadyMetOnEntry = useRef(false);
+
+  const [trackState, setTrackState] = useState({
+    startDateStr: '',
+    includeYou: true,
+    activeTab: 0,
+    m1Customers: initM1(),
+    m2Customers: [emptyCustomer(),emptyCustomer(),emptyCustomer(),emptyCustomer(),emptyCustomer(),emptyCustomer()],
+  });
+
+  const computeFSB = (ts) => {
+    const all = [...ts.m1Customers,...ts.m2Customers];
+    return all.filter(c=>c.type!==null).length >= 6 && all.some(c=>c.isPartner);
+  };
+
+  const handleSetAppMode = (m) => {
+    if (m === 'track' && appMode !== 'track') {
+      fsbAlreadyMetOnEntry.current = computeFSB(trackState);
+    }
+    setAppMode(m);
+  };
+
+  const appSwipeStart = useRef(null);
+  const handleAppTouchStart = (e) => { appSwipeStart.current = e.touches[0].clientX; };
+  const handleAppTouchEnd   = (e) => {
+    if (appSwipeStart.current === null) return;
+    const dx = e.changedTouches[0].clientX - appSwipeStart.current;
+    if (Math.abs(dx) > 60) handleSetAppMode(dx < 0 ? 'track' : 'show');
+    appSwipeStart.current = null;
+  };
+
+  const { m1Customers, m2Customers, startDateStr } = trackState;
+  const trackCombined = (() => {
+    const calcCBSupported = (c, treatAsOwn) => {
+      const raw = calcCB(treatAsOwn?null:c.type, c.services);
+      return c.supported ? raw/2 : raw;
+    };
+    const m1CB  = m1Customers.reduce((s,c)=>s+calcCBSupported(c,c.type==='own'),0);
+    const m2CB  = m2Customers.reduce((s,c)=>s+calcCBSupported(c,false),0);
+    const m1HAB = (() => { const n=m1Customers.filter(c=>c.type==='homeowner'&&(c.services===3||c.services===4)).length; return n*calcHAB(n); })();
+    const m2HAB = (() => { const n=m2Customers.filter(c=>c.type==='homeowner'&&(c.services===3||c.services===4)).length; return n*calcHAB(n); })();
+    const allFilled = m1Customers.filter(c=>c.type!==null).length + m2Customers.filter(c=>c.type!==null).length;
+    const hasPtnr   = [...m1Customers,...m2Customers].some(c=>c.isPartner);
+    return m1CB+m2CB+m1HAB+m2HAB+((allFilled>=6&&hasPtnr)?500:0);
+  })();
+
+  const headerDayInfo = (() => {
+    if (appMode !== 'track' || !startDateStr) return null;
+    const sd = parseLocalDate(startDateStr);
+    const dl = Math.max(0, 30 - (Math.floor((new Date()-sd)/86400000)+1));
+    if (dl === 0) return { label:'🎉 Done!', color:'#16a34a' };
+    return { label:`${dl} days left`, color:'#ea580c' };
+  })();
+
+  const guardedFSBCelebration = useCallback(() => {
+    if (fsbAlreadyMetOnEntry.current) return;
+    setShowFSBCelebration(true);
+    setTimeout(() => setShowFSBCelebration(false), 3000);
+  }, []);
+
+  return (
+    <div onTouchStart={handleAppTouchStart} onTouchEnd={handleAppTouchEnd}
+      style={{minHeight:'100vh',background:'linear-gradient(135deg,#fdf2f8,#f5f3ff)'}}>
+      <div style={{maxWidth:'42rem',margin:'0 auto'}}>
+
+        {/* ── Sticky header ── */}
+        <div style={{position:'sticky',top:0,zIndex:30,background:'linear-gradient(135deg,#fdf2f8,#f5f3ff)',paddingTop:'0.75rem',paddingBottom:'0.5rem',paddingLeft:'1rem',paddingRight:'1rem',borderBottom:'1px solid rgba(196,181,253,0.3)'}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:'0.5rem'}}>
+
+            {/* Left: day counter + Show/Track toggle stacked */}
+            <div style={{width:'5.5rem',flexShrink:0,display:'flex',flexDirection:'column',gap:'0.3rem'}}>
+              {headerDayInfo ? (
+                <div style={{fontSize:'0.75rem',fontWeight:'700',color:headerDayInfo.color,lineHeight:1.2}}>{headerDayInfo.label}</div>
+              ) : (
+                <div style={{height:'1rem'}}/>
+              )}
+              <div style={{display:'inline-flex',background:'white',borderRadius:'0.5rem',padding:'0.15rem',boxShadow:'0 1px 4px rgba(0,0,0,0.1)'}}>
+                {['show','track'].map(m=>(
+                  <button key={m} onClick={()=>handleSetAppMode(m)}
+                    style={{padding:'0.2rem 0.45rem',border:'none',borderRadius:'0.35rem',fontWeight:'700',fontSize:'0.6rem',cursor:'pointer',background:appMode===m?(m==='show'?'#7c3aed':'#0f172a'):'transparent',color:appMode===m?'white':'#9ca3af',transition:'all 0.15s'}}>
+                    {m==='show'?'👀':'📍'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Centre: title */}
+            <h1 style={{flex:1,fontSize:'1.1rem',fontWeight:'700',color:'#1f2937',textAlign:'center',margin:0,lineHeight:1.2,paddingTop:'0.25rem'}}>
+              UW Partner<br/>Earnings Tool
+            </h1>
+
+            {/* Right: total earned — Track only */}
+            <div style={{width:'5.5rem',flexShrink:0,textAlign:'right',paddingTop:'0.1rem',minHeight:'2.5rem'}}>
+              {appMode==='track' && trackCombined > 0 && (
+                <>
+                  <div style={{fontSize:'0.5rem',color:'#9ca3af',fontWeight:'600',letterSpacing:'0.06em',lineHeight:1,marginBottom:'0.1rem'}}>EARNED</div>
+                  <div style={{fontSize:'1.75rem',fontWeight:'700',color:'#7c3aed',lineHeight:1}}>£{trackCombined.toLocaleString()}</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Page content ── */}
+        <div style={{padding:'0.75rem 1rem 1.5rem'}}>
+          {appMode === 'show'
+            ? <ShowMode showInfoPopup={showInfoPopup} setShowInfoPopup={setShowInfoPopup}/>
+            : <TrackMode trackState={trackState} setTrackState={setTrackState} onFSBCelebration={guardedFSBCelebration}/>
+          }
+        </div>
+
+      </div>
+
+      {showInfoPopup && <HowPaidPopup onClose={()=>setShowInfoPopup(false)}/>}
+
+      {showFSBCelebration && appMode === 'track' && (
+        <>
+          <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:50}}>
+            {[...Array(50)].map((_,i)=>(
+              <div key={i} className="animate-confetti" style={{position:'absolute',left:`${Math.random()*100}%`,top:'-10%',animationDelay:`${Math.random()*0.5}s`,animationDuration:`${2+Math.random()}s`}}>
+                <div style={{color:'#facc15',fontSize:`${Math.random()*20+10}px`,transform:`rotate(${Math.random()*360}deg)`}}>✨</div>
+              </div>
+            ))}
+          </div>
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:40,padding:'1rem'}}>
+            <div className="animate-bounceOnce" style={{background:'white',borderRadius:'1rem',padding:'2rem',maxWidth:'28rem',textAlign:'center'}}>
+              <div style={{fontSize:'3.75rem',marginBottom:'1rem'}}>🎉</div>
+              <h2 style={{fontSize:'1.875rem',fontWeight:'700',color:'#7c3aed',marginBottom:'1rem'}}>Congratulations!</h2>
+              <p style={{fontSize:'1.25rem',color:'#374151',marginBottom:'0.5rem'}}>You've qualified for the</p>
+              <p style={{fontSize:'2.25rem',fontWeight:'700',color:'#16a34a',marginBottom:'1rem'}}>£500 Fast Starter Bonus!</p>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
