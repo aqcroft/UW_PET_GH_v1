@@ -669,6 +669,12 @@ const TrackGrid = ({ customers, setCustomers, label, includeYou, isMonth1, gathe
 
   const MIN_ROWS = 2;
   const canRemoveRow = customers.length > MIN_ROWS * 3;
+  // HAB is per calendar month, based on how many qualifying (3+ service) homeowners are in THIS grid/month
+const qualifyingCount = customers.filter(
+  c => c.type === 'homeowner' && (c.services === 3 || c.services === 4)
+).length;
+
+const habPerCustomer = calcHAB(qualifyingCount); // 0 / 50 / 100
 
   const addRow = () => setCustomers(prev => [...prev, emptyCustomer(), emptyCustomer(), emptyCustomer()]);
   const removeLastRow = () => { if (canRemoveRow) setCustomers(prev => prev.slice(0, prev.length - 3)); };
